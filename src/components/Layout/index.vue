@@ -108,7 +108,7 @@ const handleLogout = async () => {
         <NavigationMenuList>
           <!-- Logo -->
           <div class="flex items-center mr-6">
-            <img src="/icon_transparent.png" alt="Logo" class="h-8 w-auto mr-2" />
+            <img src="/icon.png" alt="Logo" class="h-8 w-auto mr-2" />
             <span class="text-xl font-bold">聚合工具</span>
           </div>
 

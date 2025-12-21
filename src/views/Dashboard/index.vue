@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import GithubTrending from '@/components/GithubTrending/index.vue'
 
 // 定义组件名称解决linter错误
 defineOptions({

@@ -136,7 +136,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       <!-- 标题和图标 -->
       <div class="text-center">
         <div class="flex justify-center mb-4">
-          <img src="/icon.jpeg" alt="Logo" class="h-20 w-auto" />
+          <img src="/icon.png" alt="Logo" class="h-20 w-auto" />
         </div>
         <h2 class="mt-2 text-3xl font-extrabold">欢迎登录</h2>
         <p class="mt-2 text-sm text-muted-foreground mb-6">请输入您的账户信息</p>
@@ -244,7 +244,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             <a href="#" class="font-medium text-primary hover:text-primary/80"> 忘记密码? </a>
           </div>
           <div class="text-sm">
-            <router-link to="/register" class="font-medium text-primary hover:text-primary/80"> 注册账号 </router-link>
+            <router-link to="/register" class="font-medium text-primary hover:text-primary/80"> 申请账号 </router-link>
           </div>
         </div>
       </form>

@@ -131,9 +131,9 @@ const onSubmit = form.handleSubmit(async (values) => {
       <!-- 标题和图标 -->
       <div class="text-center">
         <div class="flex justify-center mb-3">
-          <img src="/icon.jpeg" alt="Logo" class="h-16 w-auto" />
+          <img src="/icon.png" alt="Logo" class="h-24 w-auto" />
         </div>
-        <h2 class="mt-1 text-2xl font-extrabold">注册账号</h2>
+        <h2 class="mt-1 text-2xl font-extrabold">申请账号</h2>
         <p class="mt-1 text-sm text-muted-foreground mb-4">创建您的账户</p>
       </div>
 
