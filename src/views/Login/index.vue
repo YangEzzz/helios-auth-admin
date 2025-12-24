@@ -50,14 +50,13 @@ const onSubmit = form.handleSubmit(async (values) => {
     // 调用登录API
     const response = await login({
       email: values.email,
-      password: values.password,
-      name: values.email // 使用邮箱作为名称，根据API类型的要求
+      password: values.password
     })
 
     // 检查响应是否成功
-    if (response && response.code === 200 && response.data && response.data.token) {
+    if (response && response.code === 200 && response.data) {
       // 设置token
-      setToken(response.data.token)
+      setToken(response.data)
 
       // 显示成功消息
       toast.success('登录成功', {

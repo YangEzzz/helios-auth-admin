@@ -1,5 +1,4 @@
 export interface LoginRequestType {
-  name: string
   email: string
   password: string
 }
@@ -18,5 +17,5 @@ export interface RegisterResponseType {
 
 export interface LoginResponseType {
   message: string
-  token: string
+  data: string
 }

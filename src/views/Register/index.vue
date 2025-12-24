@@ -10,6 +10,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { useRouter, useRoute } from 'vue-router'
 import { register } from '@/api/login'
 import { setToken } from '@/utils/auth'
+import {toast} from "vue-sonner";
 
 // 暗黑模式设置
 const isDark = useDark()
@@ -60,22 +61,17 @@ const onSubmit = form.handleSubmit(async (values) => {
       confirmPassword: values.confirmPassword
     })
 
-    // 注册成功后保存token
-    if (response.data && response.data.token) {
-      console.log('注册成功，获取到token:', response.data.token)
-      setToken(response.data.token)
+    if(response.code !== 200) {
+      throw new Error(response.message)
     } else {
-      throw new Error('注册成功但未获取到token')
+      toast.success(response.message, {
+        duration: 2000,
+        position: 'top-center'
+      })
     }
-
-    // 获取重定向地址（如果有）
-    const redirectPath = (route.query.redirect as string) || '/'
-
-    // 注册成功后跳转
-    router.push(redirectPath)
   } catch (error) {
     // 处理错误
-    errorMessage.value = '注册失败，请稍后再试'
+    errorMessage.value = error.message
     console.error('注册错误:', error)
   } finally {
     isLoading.value = false
