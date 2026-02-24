@@ -1,0 +1,56 @@
+<script setup lang="ts">
+import { useAuth } from '@/composables/use-auth'
+import ToForgotPasswordLink from '@/views/Auth/components/ToForgotPasswordLink.vue'
+import AuthTitle from './components/AuthTitle.vue'
+
+const { login, loading } = useAuth()
+</script>
+
+<template>
+  <div class="flex items-center justify-center min-h-screen p-4 min-w-screen">
+    <main class="flex flex-col gap-4 sm:w-1/2">
+      <AuthTitle />
+      <UiCard class="w-full max-w-5xl">
+        <UiCardHeader>
+          <UiCardTitle class="text-2xl">
+            Login
+          </UiCardTitle>
+          <UiCardDescription>
+            Enter your email and password below to log into your account.
+            Not have an account?111111111111111111111111111
+            <UiButton
+              variant="link" class="px-0 text-muted-foreground"
+              @click="$router.push('/auth/sign-up')"
+            >
+              Sign Up
+            </UiButton>
+          </UiCardDescription>
+        </UiCardHeader>
+        <UiCardContent class="grid gap-4">
+          <div class="grid gap-2">
+            <UiLabel for="email">
+              Email
+            </UiLabel>
+            <UiInput id="email" type="email" placeholder="m@example.com" required />
+          </div>
+          <div class="grid gap-2">
+            <div class="flex items-center justify-between">
+              <UiLabel for="password">
+                Password
+              </UiLabel>
+              <ToForgotPasswordLink />
+            </div>
+            <UiInput id="password" type="password" required placeholder="*********" />
+          </div>
+
+          <UiButton class="w-full" @click="login">
+            <UiSpinner v-if="loading" class="mr-2" />
+            Mock Login
+          </UiButton>
+
+          <UiSeparator label="Or continue with" />
+        </UiCardContent>
+      </UiCard>
+    </main>
+  </div>
+</template>
