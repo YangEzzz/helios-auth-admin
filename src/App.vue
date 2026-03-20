@@ -7,7 +7,7 @@ useSystemTheme()
 </script>
 
 <template>
-  <Toaster />
+  <Toaster position="top-center" rich-colors />
 
   <Suspense>
     <router-view v-slot="{ Component, route }">

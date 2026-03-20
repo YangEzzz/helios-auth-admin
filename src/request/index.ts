@@ -31,12 +31,14 @@ export type RequestError = AxiosError<{
   message?: string
   result?: unknown
   errorMessage?: string
+  error?: string
 }>
 
 // 异常拦截处理器
 const errorHandler = (error: RequestError): Promise<never> => {
   const status = error.response?.status
-  const errorMessage = error.response?.data?.errorMessage || error.message || '请求错误'
+  const data = error.response?.data
+  const errorMessage = data?.message || data?.error || data?.errorMessage || error.message || '请求错误'
 
   // 根据状态码处理特定错误
   switch (status) {
@@ -53,13 +55,14 @@ const errorHandler = (error: RequestError): Promise<never> => {
       console.error('请求的资源不存在')
       break
     case 500:
-      console.error('服务器错误')
+      console.error('服务器错误:', errorMessage)
       break
     default:
       console.error(errorMessage)
   }
 
-  return Promise.reject(error)
+  // 抛出带有真实信息的 Error
+  return Promise.reject(new Error(errorMessage))
 }
 
 // 请求拦截器
@@ -102,7 +105,7 @@ const responseHandler = (response: AxiosResponse) => {
   }
 
   if (code !== ResultEnum.SUCCESS) {
-    throw new Error(data.message || '请求失败')
+    throw new Error(data.message || data.error || data.errorMessage || '请求失败')
   }
   else {
     return data

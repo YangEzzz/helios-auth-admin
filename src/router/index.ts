@@ -1,23 +1,91 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
-
-// 定义公共路由（不需要登录即可访问）
-// const publicRoutes = ['/login', '/register', '/404']
+import { useAuthStore } from '@/store/auth'
+import { reqUserInfo } from '@/api/user'
+import { getToken } from '@/utils/auth'
 
 // 基础路由 - 不需要权限控制的路由
 const baseRoutes: RouteRecordRaw[] = [
+  // ===== 认证路由（无需登录）=====
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/Login/index.vue'),
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/Register/index.vue'),
+  },
+
+  // ===== 主应用路由（需要登录）=====
   {
     path: '/',
     redirect: '/dashboard',
     component: () => import('@/layouts/index.vue'),
     children: [
+      // 仪表盘
       {
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/views/Dashboard/index.vue'),
       },
+      // 个人资料
+      {
+        path: 'profile',
+        name: 'profile',
+        component: () => import('@/views/Profile/index.vue'),
+        meta: { title: '个人资料', icon: 'User', showInMenu: false }
+      },
+      // 我的项目
+      {
+        path: 'my-projects',
+        name: 'my-projects',
+        component: () => import('@/views/MyProjects/index.vue'),
+      },
+      // 账户审批
+      {
+        path: 'approvals',
+        name: 'Approvals',
+        component: () => import('@/views/Approvals/index.vue'),
+        meta: { title: '账户审批', icon: 'UserPlus', showInMenu: true }
+      },
+      // 用户管理
+      {
+        path: 'users',
+        name: 'Users',
+        component: () => import('@/views/Users/index.vue'),
+        meta: { title: '用户管理', icon: 'User', showInMenu: true }
+      },
+      // 项目管理
+      {
+        path: 'projects',
+        name: 'projects',
+        component: () => import('@/views/Projects/index.vue'),
+      },
+      // 项目详情/具体管理
+      {
+        path: 'projects/:id',
+        name: 'project-detail',
+        component: () => import('@/views/Projects/Detail/index.vue'),
+        meta: { title: '项目详情', showInMenu: false }
+      },
+      // 权限管理
+      {
+        path: 'permissions',
+        name: 'permissions',
+        component: () => import('@/views/Permissions/index.vue'),
+      },
+      // 操作日志
+      {
+        path: 'audit-logs',
+        name: 'audit-logs',
+        component: () => import('@/views/AuditLogs/index.vue'),
+      },
     ],
   },
+
+  // ===== 旧版 Auth 路由（保留兼容性）=====
   {
     path: '/tasks',
     component: () => import('@/layouts/index.vue'),
@@ -29,7 +97,6 @@ const baseRoutes: RouteRecordRaw[] = [
       },
     ],
   },
-  // Auth routes - 认证相关路由
   {
     path: '/auth',
     children: [
@@ -101,67 +168,49 @@ const router = createRouter({
   },
 })
 
-// 全局前置守卫
-// router.beforeEach(async (to, _, next) => {
-//   // 检查当前路由是否为公共路由
-//   const isPublicRoute = publicRoutes.includes(to.path)
-//
-//   // 如果用户已登录但动态路由尚未初始化
-//   if (isLoggedIn() && !hasInitRoutes) {
-//     try {
-//       // 获取权限store
-//       // const permissionStore = await initStore()
-//       //
-//       // // 获取用户菜单
-//       // const response = await fetchUserMenus()
-//       //
-//       // if (response.code === 200 && response.data) {
-//       //   // 设置菜单数据
-//       //   permissionStore.setMenus(response.data)
-//       //
-//       //   // 生成并添加动态路由
-//       //   permissionStore.addRoutes()
-//       //
-//       //   // 标记路由已初始化
-//       //   hasInitRoutes = true
-//       //
-//       //   // 如果访问的是根路径，重定向到首页
-//       //   if (to.path === '/') {
-//       //     next({ path: '/dashboard', replace: true })
-//       //   } else {
-//       //     // 重定向到目标页面，确保新路由能够被正确匹配
-//       //     next({ ...to, replace: true })
-//       //   }
-//       //   return
-//       // }
-//     }
-//     catch (error) {
-//       console.error('初始化路由失败:', error)
-//     }
-//   }
-//
-//   // 如果不是公共路由且用户未登录，则重定向到登录页
-//   if (!isPublicRoute && !isLoggedIn()) {
-//     next({
-//       path: '/login',
-//       query: { redirect: to.fullPath }, // 保存原目标路径，以便登录后重定向
-//     })
-//   }
-//   else if ((to.path === '/login' || to.path === '/register') && isLoggedIn()) {
-//     // 如果用户已登录但访问登录或注册页，则重定向到首页
-//     next({ path: '/' })
-//   }
-//   else {
-//     // 其他情况正常放行
-//     next()
-//   }
-// })
+// 路由白名单，不需要登录即可进入
+const whiteList = ['/login', '/register']
+
+// 全局前置守卫：登录鉴权与重定向
+router.beforeEach(async (to, _from, next) => {
+  const authStore = useAuthStore()
+  const token = getToken()
+
+  if (token) {
+    if (to.path === '/login' || to.path === '/register') {
+      next({ path: '/' })
+    } else {
+      // 关键：如果有 token 但没有用户信息，说明是刷新页面或伪造 token
+      if (!authStore.userInfo) {
+        try {
+          // 调用后端接口获取用户信息，校验 token 真实性
+          const res = await reqUserInfo()
+          // 假设返回结构是 { code: 200, data: { ...UserInfo }, message: "" }
+          authStore.userInfo = res.data 
+          next()
+        } catch (error) {
+          // Token 校验失败（后端返回 401 等）
+          authStore.logout()
+          next({ path: '/login', query: { redirect: to.fullPath } })
+        }
+      } else {
+        next()
+      }
+    }
+  } else {
+    // 未登录状态下
+    if (whiteList.includes(to.path)) {
+      next()
+    } else {
+      next({ path: '/login', query: { redirect: to.fullPath } })
+    }
+  }
+})
 
 // 清除路由和登出时重置路由状态
 export const resetRouter = async () => {
   // const permissionStore = await initStore()
   // permissionStore.resetRoutes()
-  // hasInitRoutes = false
 }
 
 export default router

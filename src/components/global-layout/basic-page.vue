@@ -18,7 +18,7 @@ defineProps<LayoutHeaderProps>()
       </template>
     </BasicHeader>
 
-    <main class="py-4">
+    <main class="pt-0 pb-4">
       <slot />
     </main>
   </main>

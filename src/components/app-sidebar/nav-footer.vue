@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import type { User } from './types'
+// Removed unused User type
 
 import {
   BadgeCheck,
-  Bell,
   ChevronsUpDown,
-  CreditCard,
   LogOut,
-  Sparkles,
   UserRoundCog,
 } from 'lucide-vue-next'
 
@@ -23,12 +20,27 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 
-const { user } = defineProps<
-  { user: User }
->()
+import { useAuthStore } from '@/store/auth'
+import { useRouter } from 'vue-router'
 
-const { logout } = useAuth()
+// const { user } = defineProps<{ user: User }>()
+
+const authStore = useAuthStore()
+const router = useRouter()
 const { isMobile, open } = useSidebar()
+
+const user = computed(() => {
+  return authStore.userInfo || {
+    name: 'User',
+    email: 'user@helios.dev',
+    avatar: '',
+  }
+})
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -41,14 +53,14 @@ const { isMobile, open } = useSidebar()
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
             <Avatar class="size-8 rounded-lg">
-              <AvatarImage :src="user.avatar" :alt="user.name" />
+              <AvatarImage :src="user.avatar || ''" :alt="user.name || 'User'" />
               <AvatarFallback class="rounded-lg">
-                CN
+                {{ (user.name || 'User').slice(0, 2).toUpperCase() }}
               </AvatarFallback>
             </Avatar>
             <div class="grid flex-1 text-sm leading-tight text-left">
-              <span class="font-semibold truncate">{{ user.name }}</span>
-              <span class="text-xs truncate">{{ user.email }}</span>
+              <span class="font-semibold truncate">{{ user.name || 'User' }}</span>
+              <span class="text-xs truncate">{{ user.email || '' }}</span>
             </div>
             <ChevronsUpDown class="ml-auto size-4" />
           </SidebarMenuButton>
@@ -61,55 +73,35 @@ const { isMobile, open } = useSidebar()
         >
           <DropdownMenuLabel class="p-0 font-normal">
             <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-              <Avatar class="size-8 rounded-lg">
-                <AvatarImage :src="user.avatar" :alt="user.name" />
-                <AvatarFallback class="rounded-lg">
-                  CN
-                </AvatarFallback>
-              </Avatar>
+            <Avatar class="size-8 rounded-lg">
+              <AvatarImage :src="user.avatar || ''" :alt="user.name || 'User'" />
+              <AvatarFallback class="rounded-lg font-black bg-primary/10 text-primary">
+                {{ (user.name || 'User').slice(0, 1).toUpperCase() }}
+              </AvatarFallback>
+            </Avatar>
               <div class="grid flex-1 text-sm leading-tight text-left">
-                <span class="font-semibold truncate">{{ user.name }}</span>
-                <span class="text-xs truncate">{{ user.email }}</span>
+                <span class="font-semibold truncate">{{ user.name || 'User' }}</span>
+                <span class="text-xs truncate">{{ user.email || '' }}</span>
               </div>
             </div>
           </DropdownMenuLabel>
 
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem @click="$router.push('/billing/')">
-              <Sparkles />
-              Upgrade to Pro
+            <DropdownMenuItem @click="router.push('/profile')">
+              <BadgeCheck class="size-4" />
+              个人资料
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="router.push('/settings')">
+              <UserRoundCog class="size-4" />
+              账户设置
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem @click="$router.push('/billing?type=billing')">
-              <CreditCard />
-              Billing
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem @click="$router.push('/settings/')">
-              <UserRoundCog />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="$router.push('/settings/account')">
-              <BadgeCheck />
-              Account
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="$router.push('/settings/notifications')">
-              <Bell />
-              Notifications
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuItem @click="logout">
+          <DropdownMenuItem @click="handleLogout">
             <LogOut />
-            Log out
+            退出登录
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

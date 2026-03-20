@@ -18,5 +18,6 @@ export interface DataTableProps<T> {
   loading?: boolean
   columns: ColumnDef<T, any>[]
   data: T[]
+  meta?: any // 支持透传自定义 meta
   serverPagination?: ServerPagination
 }

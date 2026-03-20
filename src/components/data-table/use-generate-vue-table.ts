@@ -1,4 +1,5 @@
-import type { ColumnFiltersState, ColumnPinningState, PaginationState, SortingState, TableOptionsWithReactiveData, VisibilityState } from '@tanstack/vue-table'
+import type { ColumnFiltersState, ColumnPinningState, PaginationState, SortingState, VisibilityState } from '@tanstack/vue-table'
+import { ref, computed, reactive } from 'vue'
 
 import type { DataTableProps } from './types'
 
@@ -41,9 +42,11 @@ export function generateVueTable<T>(props: DataTableProps<T>) {
     return -1
   })
 
-  const tableConfig: TableOptionsWithReactiveData<T> = {
+  // 直接使用 reactive 定义，保证在整个对象生命周期内都是响应式的
+  const tableConfig = reactive({
     get data() { return props.data },
     get columns() { return props.columns },
+    get meta() { return props.meta }, // 确保 meta 也是可透传的
     state: {
       get sorting() { return sorting.value },
       get columnFilters() { return columnFilters.value },
@@ -61,19 +64,19 @@ export function generateVueTable<T>(props: DataTableProps<T>) {
       },
     },
     enableRowSelection: true,
-    onSortingChange: updaterOrValue => valueUpdater(updaterOrValue, sorting),
-    onColumnFiltersChange: updaterOrValue => valueUpdater(updaterOrValue, columnFilters),
-    onColumnVisibilityChange: updaterOrValue => valueUpdater(updaterOrValue, columnVisibility),
-    onColumnPinningChange: updaterOrValue => valueUpdater(updaterOrValue, columnPinning),
-    onRowSelectionChange: updaterOrValue => valueUpdater(updaterOrValue, rowSelection),
-    onPaginationChange: updaterOrValue => valueUpdater(updaterOrValue, pagination),
+    onSortingChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, sorting),
+    onColumnFiltersChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, columnFilters),
+    onColumnVisibilityChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, columnVisibility),
+    onColumnPinningChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, columnPinning),
+    onRowSelectionChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, rowSelection),
+    onPaginationChange: (updaterOrValue: any) => valueUpdater(updaterOrValue, pagination),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  }
+  }) as any
 
   if (useServerPagination) {
     tableConfig.pageCount = pageCount.value
