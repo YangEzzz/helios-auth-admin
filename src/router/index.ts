@@ -70,13 +70,6 @@ const baseRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/Projects/Detail/index.vue'),
         meta: { title: '项目详情', showInMenu: false }
       },
-      // 权限管理
-      {
-        path: 'permissions',
-        name: 'permissions',
-        component: () => import('@/views/Permissions/index.vue'),
-      },
-      // 操作日志
       {
         path: 'audit-logs',
         name: 'audit-logs',
@@ -157,6 +150,11 @@ const baseRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/Errors/503.vue'),
       },
     ],
+  },
+  // Catch-all route to redirect non-existent paths to 404
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/errors/404',
   },
 ]
 

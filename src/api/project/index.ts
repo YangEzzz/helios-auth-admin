@@ -1,10 +1,15 @@
+import type {
+  CreateProjectData,
+  DeleteProjectData,
+  ListMyProjectsResult,
+  ListProjectResult,
+} from './type'
+import type { ResponseData } from '@/request'
 /**
  * src/api/project/index.ts
  * 项目管理相关接口封装 (Axios 版)
  */
 import request from '@/request'
-import type { ResponseData } from '@/request'
-import type { CreateProjectData, DeleteProjectData, ListProjectResult } from './type'
 
 const API = {
   LIST_URL: '/api/v1/projects',
@@ -18,6 +23,10 @@ const API = {
  */
 export const reqListProjects = () => {
   return request.get<any, ResponseData<ListProjectResult>>(API.LIST_URL)
+}
+
+export const reqMyProjects = () => {
+  return request.get<any, ResponseData<ListMyProjectsResult>>('/api/v1/my-projects')
 }
 
 /**
@@ -44,21 +53,21 @@ export const reqProjectMembers = (projectId: string) => {
 /**
  * 添加成员到项目
  */
-export const reqAddProjectMember = (data: { project_id: string; user_id: string; role: string }) => {
+export const reqAddProjectMember = (data: { project_id: string, user_id: string, role: string }) => {
   return request.post<any, ResponseData<any>>('/api/v1/project/member', data)
 }
 
 /**
  * 设置项目成员角色
  */
-export const reqSetProjectMemberRole = (data: { project_id: string; user_id: string; role: string }) => {
+export const reqSetProjectMemberRole = (data: { project_id: string, user_id: string, role: string }) => {
   return request.post<any, ResponseData<any>>('/api/v1/project/member/role', data)
 }
 
 /**
  * 为项目添加角色模板
  */
-export const reqAddProjectRoleTemplate = (data: { project_id: string; role_name: string; description: string }) => {
+export const reqAddProjectRoleTemplate = (data: { project_id: string, role_name: string, description: string }) => {
   return request.post<any, ResponseData<any>>('/api/v1/add_project_template', data)
 }
 
@@ -72,14 +81,14 @@ export const reqProjectRoleTemplates = (projectId: string) => {
 /**
  * 移除项目成员
  */
-export const reqRemoveProjectMember = (data: { project_id: string; user_id: string }) => {
+export const reqRemoveProjectMember = (data: { project_id: string, user_id: string }) => {
   return request.post<any, ResponseData<any>>('/api/v1/project/member/remove', data)
 }
 
 /**
  * 更新项目成员角色
  */
-export const reqUpdateProjectMemberRole = (data: { project_id: string; user_id: string; role: string }) => {
+export const reqUpdateProjectMemberRole = (data: { project_id: string, user_id: string, role: string }) => {
   return request.post<any, ResponseData<any>>('/api/v1/project/member/role', data)
 }
 

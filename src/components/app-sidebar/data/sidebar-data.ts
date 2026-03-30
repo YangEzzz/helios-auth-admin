@@ -7,7 +7,6 @@ import {
   FolderOpen,
   GalleryVerticalEnd,
   LayoutDashboard,
-  Shield,
   UserCheck,
   Users,
 } from 'lucide-vue-next'
@@ -53,7 +52,6 @@ export const sidebarData: SidebarData = {
         { title: '账户审批', url: '/approvals', icon: UserCheck },
         { title: '用户管理', url: '/users', icon: Users },
         { title: '项目管理', url: '/projects', icon: FolderOpen },
-        { title: '权限管理', url: '/permissions', icon: Shield },
         { title: '操作日志', url: '/audit-logs', icon: ClipboardList },
       ],
     },

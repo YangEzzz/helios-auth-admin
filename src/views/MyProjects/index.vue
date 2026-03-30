@@ -1,95 +1,227 @@
 <script setup lang="ts">
-import { ExternalLink, FolderOpen, Search, ShieldCheck } from 'lucide-vue-next'
-import { ref } from 'vue'
+import type { MyProjectMembership } from '@/api/project/type'
+import dayjs from 'dayjs'
+import {
+  ArrowRight,
+  FolderOpen,
+  RefreshCw,
+  Search,
+  Sparkles,
+} from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { reqMyProjects } from '@/api/project'
 import { BasicPage } from '@/components/global-layout'
 
+interface MyProjectCard {
+  id: string
+  name: string
+  key: string
+  description: string
+  role: string
+  grantedAt: string
+  grantedAtText: string
+}
+
 const searchQuery = ref('')
+const loading = ref(false)
+const memberships = ref<MyProjectMembership[]>([])
 
-const myProjects = ref([
-  { id: 1, name: 'HeliosPortal', description: '统一认证门户，提供单点登录与权限管理功能', role: 'developer', grantedAt: '2026-01-15' },
-  { id: 2, name: 'DataPipeline-v2', description: '数据处理流水线系统，支持实时数据同步与批量处理', role: 'tester', grantedAt: '2026-01-28' },
-  { id: 3, name: 'DocumentCenter', description: '企业内部文档中心与知识库', role: 'viewer', grantedAt: '2026-02-10' },
-])
+const roleMap: Record<string, { label: string, class: string, accent: string }> = {
+  owner: {
+    label: 'Owner',
+    class: 'border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300',
+    accent: 'from-fuchsia-500/80 to-violet-500/35',
+  },
+  developer: {
+    label: '开发者',
+    class: 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    accent: 'from-sky-500/80 to-cyan-500/35',
+  },
+  tester: {
+    label: '测试者',
+    class: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    accent: 'from-amber-500/80 to-orange-500/35',
+  },
+  viewer: {
+    label: '只读',
+    class: 'border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+    accent: 'from-slate-500/80 to-slate-400/35',
+  },
+}
 
-const roleMap = {
-  owner: { label: '所有者', class: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  developer: { label: '开发者', class: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  tester: { label: '测试者', class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  viewer: { label: '只读', class: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
-} as const
+const humanizeSince = (dateString?: string) => {
+  if (!dateString)
+    return '未知'
 
-type RoleKey = keyof typeof roleMap
+  const diffHours = dayjs().diff(dayjs(dateString), 'hour')
 
-const filtered = computed(() => {
-  if (!searchQuery.value) return myProjects.value
-  return myProjects.value.filter(p => p.name.includes(searchQuery.value) || p.description.includes(searchQuery.value))
+  if (diffHours < 1)
+    return '刚刚'
+  if (diffHours < 24)
+    return `${diffHours} 小时前`
+
+  const diffDays = dayjs().diff(dayjs(dateString), 'day')
+  if (diffDays < 7)
+    return `${diffDays} 天前`
+
+  return dayjs(dateString).format('YYYY-MM-DD')
+}
+
+const projectCards = computed<MyProjectCard[]>(() => {
+  return memberships.value
+    .filter(item => item.project)
+    .map((item) => {
+      const project = item.project!
+      return {
+        id: project.id,
+        name: project.project_name,
+        key: project.project_id_string,
+        description: project.description || '暂无项目描述，建议联系项目负责人补充接入说明。',
+        role: item.role_in_project,
+        grantedAt: item.created_at,
+        grantedAtText: humanizeSince(item.created_at),
+      }
+    })
+})
+
+const filteredProjects = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase()
+  if (!keyword)
+    return projectCards.value
+
+  return projectCards.value.filter(project =>
+    project.name.toLowerCase().includes(keyword)
+    || project.key.toLowerCase().includes(keyword)
+    || project.description.toLowerCase().includes(keyword),
+  )
+})
+
+const fetchMyProjects = async () => {
+  loading.value = true
+  try {
+    const res = await reqMyProjects()
+    memberships.value = res.data.projects || []
+  }
+  catch (error: any) {
+    toast.error(error.message || '加载我的项目失败')
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchMyProjects()
 })
 </script>
 
 <template>
-  <BasicPage title="我的项目" description="查看我已获授权访问的项目列表">
-    <!-- Search -->
-    <div class="flex gap-3 mb-4">
-      <div class="relative flex-1 max-w-xs">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <UiInput v-model="searchQuery" placeholder="搜索项目名称..." class="pl-9" />
-      </div>
-    </div>
+  <BasicPage title="我的项目" description="查看当前账号已获授权的项目列表">
+    <template #actions>
+      <UiButton variant="outline" size="sm" :disabled="loading" @click="fetchMyProjects">
+        <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+        刷新列表
+      </UiButton>
+    </template>
 
-    <!-- Project Cards Grid -->
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-4">
-      <UiCard
-        v-for="project in filtered"
-        :key="project.id"
-        class="flex flex-col group hover:border-primary/50 transition-colors duration-200"
-      >
-        <UiCardHeader class="pb-3">
-          <div class="flex items-start justify-between gap-2">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
-                <FolderOpen class="h-5 w-5 text-primary" />
-              </div>
-              <div class="min-w-0">
-                <UiCardTitle class="text-base truncate">{{ project.name }}</UiCardTitle>
-              </div>
-            </div>
+    <div class="space-y-6">
+      <section class="space-y-4">
+        <div class="flex flex-col gap-3 rounded-[28px] border border-border/60 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_24%),linear-gradient(135deg,_rgba(15,23,42,0.03),_rgba(255,255,255,0))] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <Sparkles class="h-4 w-4 text-primary" />
+            共 {{ projectCards.length }} 个已授权项目
           </div>
-        </UiCardHeader>
-        <UiCardContent class="flex-1 pb-3">
-          <p class="text-xs text-muted-foreground leading-relaxed line-clamp-2 min-h-[40px]">
-            {{ project.description }}
-          </p>
-          
-          <div class="mt-4 p-3 rounded-lg bg-muted/40 border border-border/50 flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck class="w-3.5 h-3.5" /> 我的角色</span>
-              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', roleMap[project.role as RoleKey].class]">
-                {{ roleMap[project.role as RoleKey].label }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between mt-1">
-              <span class="text-xs text-muted-foreground">授权时间</span>
-              <span class="text-xs font-mono">{{ project.grantedAt }}</span>
-            </div>
+          <div class="relative w-full sm:max-w-sm">
+            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <UiInput v-model="searchQuery" class="pl-9" placeholder="搜索项目名称、标识或描述..." />
           </div>
-        </UiCardContent>
-        <UiCardFooter class="pt-3 border-t">
-          <UiButton variant="outline" class="w-full h-8 text-xs">
-            <ExternalLink class="h-3 w-3 mr-1.5" />
-            进入项目工作台
-          </UiButton>
-        </UiCardFooter>
-      </UiCard>
+        </div>
 
-      <!-- Empty State -->
-      <div
-        v-if="filtered.length === 0"
-        class="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground bg-card rounded-xl border border-dashed"
-      >
-        <FolderOpen class="h-12 w-12 mb-4 opacity-20" />
-        <p class="text-base font-medium text-foreground">暂无项目权限</p>
-        <p class="text-sm mt-1">您尚未被授权访问任何项目，或者没有匹配的搜索结果</p>
-      </div>
+        <div v-if="loading && !projectCards.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <UiCard v-for="index in 6" :key="index" class="rounded-3xl border-border/50">
+            <UiCardContent class="space-y-4 p-6">
+              <UiSkeleton class="h-5 w-24" />
+              <UiSkeleton class="h-4 w-32" />
+              <UiSkeleton class="h-16 w-full" />
+              <UiSkeleton class="h-10 w-full" />
+            </UiCardContent>
+          </UiCard>
+        </div>
+
+        <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <UiCard
+            v-for="project in filteredProjects"
+            :key="project.id"
+            class="group overflow-hidden rounded-3xl border-border/50 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
+          >
+            <div class="h-1.5 w-full bg-gradient-to-r" :class="[(roleMap[project.role] ?? roleMap.viewer).accent]" />
+            <UiCardHeader class="pb-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-3">
+                  <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <FolderOpen class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0">
+                    <UiCardTitle class="truncate text-base">
+                      {{ project.name }}
+                    </UiCardTitle>
+                    <p class="mt-1 truncate text-xs text-muted-foreground">
+                      {{ project.key }}
+                    </p>
+                  </div>
+                </div>
+                <span class="rounded-full border px-2.5 py-1 text-xs font-medium" :class="[(roleMap[project.role] ?? roleMap.viewer).class]">
+                  {{ (roleMap[project.role] ?? { label: project.role || '未设置' }).label }}
+                </span>
+              </div>
+            </UiCardHeader>
+
+            <UiCardContent class="space-y-4">
+              <p class="line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-muted-foreground">
+                {{ project.description }}
+              </p>
+
+              <div class="rounded-2xl border border-border/50 bg-muted/25 p-4">
+                <div class="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>授权日期</span>
+                  <span class="font-mono text-foreground">{{ dayjs(project.grantedAt).format('YYYY-MM-DD') }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>最近变化</span>
+                  <span>{{ project.grantedAtText }}</span>
+                </div>
+              </div>
+            </UiCardContent>
+
+            <UiCardFooter class="border-t border-border/50 pt-4">
+              <div class="flex w-full items-center justify-end">
+                <RouterLink
+                  :to="`/projects/${project.id}`"
+                  class="inline-flex items-center gap-1 text-sm font-medium text-primary transition-transform group-hover:translate-x-0.5"
+                >
+                  查看详情
+                  <ArrowRight class="h-4 w-4" />
+                </RouterLink>
+              </div>
+            </UiCardFooter>
+          </UiCard>
+
+          <div
+            v-if="!filteredProjects.length"
+            class="col-span-full flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed bg-card px-6 text-center"
+          >
+            <FolderOpen class="mb-4 h-12 w-12 text-muted-foreground/30" />
+            <p class="text-base font-medium">
+              暂无匹配项目
+            </p>
+            <p class="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              可能是当前账号还没有被授予项目权限，或者搜索条件过于严格。
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   </BasicPage>
 </template>

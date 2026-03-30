@@ -18,9 +18,22 @@ export interface ProjectInfo {
   owner?: string
 }
 
+export interface MyProjectMembership {
+  id: string
+  user_id: string
+  project_id: string
+  role_in_project: string
+  created_at: string
+  project?: ProjectInfo
+}
+
 export interface ListProjectResult {
   projects: ProjectInfo[]
   code: number
+}
+
+export interface ListMyProjectsResult {
+  projects: MyProjectMembership[]
 }
 
 export interface CreateProjectData {
