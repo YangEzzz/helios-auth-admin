@@ -20,23 +20,8 @@ const searchQuery = ref('')
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const res: any = await reqUserList({ page: 1, page_size: 100 })
-
-    if (Array.isArray(res)) {
-      rawUsers.value = res
-    }
-    else if (res.users && Array.isArray(res.users)) {
-      rawUsers.value = res.users
-    }
-    else if (res.data?.users && Array.isArray(res.data.users)) {
-      rawUsers.value = res.data.users
-    }
-    else if (res.data && Array.isArray(res.data)) {
-      rawUsers.value = res.data
-    }
-    else {
-      rawUsers.value = []
-    }
+    const res = await reqUserList({ page: 1, page_size: 100 })
+    rawUsers.value = res.data.users
   }
   catch {
     toast.error('获取列表失败')

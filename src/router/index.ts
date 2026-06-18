@@ -1,8 +1,14 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/store/auth'
 import { reqUserInfo } from '@/api/user'
+import { useAuthStore } from '@/store/auth'
 import { getToken } from '@/utils/auth'
+
+const adminRoles = ['admin', 'super_admin']
+
+const isAdminRole = (role?: string) => {
+  return !!role && adminRoles.includes(role)
+}
 
 // 基础路由 - 不需要权限控制的路由
 const baseRoutes: RouteRecordRaw[] = [
@@ -35,7 +41,7 @@ const baseRoutes: RouteRecordRaw[] = [
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/Profile/index.vue'),
-        meta: { title: '个人资料', icon: 'User', showInMenu: false }
+        meta: { title: '个人资料', icon: 'User', showInMenu: false },
       },
       // 我的项目
       {
@@ -48,32 +54,34 @@ const baseRoutes: RouteRecordRaw[] = [
         path: 'approvals',
         name: 'Approvals',
         component: () => import('@/views/Approvals/index.vue'),
-        meta: { title: '账户审批', icon: 'UserPlus', showInMenu: true }
+        meta: { title: '账户审批', icon: 'UserPlus', showInMenu: true, requiresAdmin: true },
       },
       // 用户管理
       {
         path: 'users',
         name: 'Users',
         component: () => import('@/views/Users/index.vue'),
-        meta: { title: '用户管理', icon: 'User', showInMenu: true }
+        meta: { title: '用户管理', icon: 'User', showInMenu: true, requiresAdmin: true },
       },
       // 项目管理
       {
         path: 'projects',
         name: 'projects',
         component: () => import('@/views/Projects/index.vue'),
+        meta: { requiresAdmin: true },
       },
       // 项目详情/具体管理
       {
         path: 'projects/:id',
         name: 'project-detail',
         component: () => import('@/views/Projects/Detail/index.vue'),
-        meta: { title: '项目详情', showInMenu: false }
+        meta: { title: '项目详情', showInMenu: false, requiresAdmin: true },
       },
       {
         path: 'audit-logs',
         name: 'audit-logs',
         component: () => import('@/views/AuditLogs/index.vue'),
+        meta: { requiresAdmin: true },
       },
     ],
   },
@@ -177,29 +185,42 @@ router.beforeEach(async (to, _from, next) => {
   if (token) {
     if (to.path === '/login' || to.path === '/register') {
       next({ path: '/' })
-    } else {
+    }
+    else {
       // 关键：如果有 token 但没有用户信息，说明是刷新页面或伪造 token
       if (!authStore.userInfo) {
         try {
           // 调用后端接口获取用户信息，校验 token 真实性
           const res = await reqUserInfo()
           // 假设返回结构是 { code: 200, data: { ...UserInfo }, message: "" }
-          authStore.userInfo = res.data 
+          authStore.userInfo = res.data
+          if (to.meta.requiresAdmin && !isAdminRole(authStore.userInfo?.role)) {
+            next({ path: '/errors/403' })
+            return
+          }
           next()
-        } catch (error) {
+        }
+        catch {
           // Token 校验失败（后端返回 401 等）
           authStore.logout()
           next({ path: '/login', query: { redirect: to.fullPath } })
         }
-      } else {
+      }
+      else {
+        if (to.meta.requiresAdmin && !isAdminRole(authStore.userInfo?.role)) {
+          next({ path: '/errors/403' })
+          return
+        }
         next()
       }
     }
-  } else {
+  }
+  else {
     // 未登录状态下
     if (whiteList.includes(to.path)) {
       next()
-    } else {
+    }
+    else {
       next({ path: '/login', query: { redirect: to.fullPath } })
     }
   }

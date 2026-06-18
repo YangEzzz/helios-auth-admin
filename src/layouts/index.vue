@@ -3,7 +3,6 @@ import { useCookies } from '@vueuse/integrations/useCookies'
 import { storeToRefs } from 'pinia'
 
 import AppSidebar from '@/components/app-sidebar/index.vue'
-import CommandMenuPanel from '@/components/command-menu-panel/index.vue'
 import ThemePopover from '@/components/custom-theme/theme-popover.vue'
 import ToggleTheme from '@/components/toggle-theme.vue'
 import { Separator } from '@/components/ui/separator'
@@ -26,7 +25,6 @@ const { contentLayout } = storeToRefs(themeStore)
       >
         <SidebarTrigger class="-ml-1" />
         <Separator orientation="vertical" class="h-6" />
-        <CommandMenuPanel />
         <div class="flex-1" />
         <div class="ml-auto flex items-center space-x-4">
           <ToggleTheme />

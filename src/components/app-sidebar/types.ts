@@ -6,6 +6,7 @@ type NavIcon = FunctionalComponent<LucideProps, Record<any, any>, any, Record<an
 interface BaseNavItem {
   title: string
   icon?: NavIcon
+  roles?: string[]
 }
 
 export type NavItem
@@ -32,6 +33,7 @@ export interface User {
 export interface Team {
   name: string
   logo: NavIcon
+  logoUrl?: string
   plan: string
 }
 

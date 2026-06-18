@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { reqLogin } from '@/api/user'
 import { useAuthStore } from '@/store/auth'
-import { useRouter, useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,16 +22,18 @@ async function handleLogin() {
   loading.value = true
   try {
     const res = await reqLogin({ email: email.value, password: password.value })
-    
+
     // Axios 请求返回的是 ResponseData 结构
-    authStore.loginSuccess(res.data.token, res.data.user) 
+    authStore.loginSuccess(res.data.token, res.data.user)
     toast.success('登录成功')
 
     const redirectParams = route.query?.redirect as string
     router.push(redirectParams || '/dashboard')
-  } catch(e: any) {
+  }
+  catch (e: any) {
     toast.error(e.message || '登录失败，请检查账号密码')
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -42,9 +44,7 @@ async function handleLogin() {
     <main class="flex flex-col gap-6 w-full max-w-md">
       <!-- Logo / Brand -->
       <div class="flex flex-col items-center gap-2 text-center">
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground text-xl font-bold">
-          H
-        </div>
+        <img src="/helios-icon.svg" alt="Helios Auth" class="h-14 w-14 rounded-2xl shadow-sm">
         <h1 class="text-2xl font-bold tracking-tight">
           Helios Auth Admin
         </h1>
@@ -65,7 +65,9 @@ async function handleLogin() {
         </UiCardHeader>
         <UiCardContent class="grid gap-4">
           <div class="grid gap-2">
-            <UiLabel for="login-email">邮箱</UiLabel>
+            <UiLabel for="login-email">
+              邮箱
+            </UiLabel>
             <UiInput
               id="login-email"
               v-model="email"
@@ -76,7 +78,9 @@ async function handleLogin() {
           </div>
           <div class="grid gap-2">
             <div class="flex items-center justify-between">
-              <UiLabel for="login-password">密码</UiLabel>
+              <UiLabel for="login-password">
+                密码
+              </UiLabel>
               <UiButton
                 variant="link"
                 class="px-0 h-auto text-xs text-muted-foreground"

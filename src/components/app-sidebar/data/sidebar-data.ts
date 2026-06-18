@@ -1,9 +1,7 @@
 import type { SidebarData, Team, User } from '../types'
 
 import {
-  AudioWaveform,
   ClipboardList,
-  Command,
   FolderOpen,
   GalleryVerticalEnd,
   LayoutDashboard,
@@ -21,17 +19,8 @@ const teams: Team[] = [
   {
     name: 'Helios Auth',
     logo: GalleryVerticalEnd,
-    plan: 'Enterprise',
-  },
-  {
-    name: 'Acme Corp.',
-    logo: AudioWaveform,
-    plan: 'Startup',
-  },
-  {
-    name: 'Evil Corp.',
-    logo: Command,
-    plan: 'Free',
+    logoUrl: '/helios-icon.svg',
+    plan: '项目入口',
   },
 ]
 
@@ -49,10 +38,10 @@ export const sidebarData: SidebarData = {
     {
       title: '管理',
       items: [
-        { title: '账户审批', url: '/approvals', icon: UserCheck },
-        { title: '用户管理', url: '/users', icon: Users },
-        { title: '项目管理', url: '/projects', icon: FolderOpen },
-        { title: '操作日志', url: '/audit-logs', icon: ClipboardList },
+        { title: '账户审批', url: '/approvals', icon: UserCheck, roles: ['admin', 'super_admin'] },
+        { title: '用户管理', url: '/users', icon: Users, roles: ['admin', 'super_admin'] },
+        { title: '项目管理', url: '/projects', icon: FolderOpen, roles: ['admin', 'super_admin'] },
+        { title: '操作日志', url: '/audit-logs', icon: ClipboardList, roles: ['admin', 'super_admin'] },
       ],
     },
   ],

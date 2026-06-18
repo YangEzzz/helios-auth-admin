@@ -23,6 +23,19 @@ export interface RegisterData {
   reason?: string
   password?: string
   confirmPassword?: string
+  avatar?: string
+}
+
+export interface RegisterResult {
+  user: UserInfo
+}
+
+export interface RoleListResult {
+  roles: string[]
+}
+
+export interface StatusListResult {
+  status: string[]
 }
 
 // 用户基础信息
@@ -43,6 +56,17 @@ export interface ListUserResult {
   page: number
   page_size: number
   total_pages: number
+}
+
+export interface UserDetailResult {
+  user: UserInfo
+}
+
+export interface UserCountResult {
+  total: number
+  active: number
+  inactive: number
+  locked: number
 }
 
 // 审核动作参数

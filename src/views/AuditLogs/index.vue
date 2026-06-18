@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import type { AuditLog } from '@/api/audit/type'
+import dayjs from 'dayjs'
 import {
   Activity,
   Download,
@@ -7,10 +8,9 @@ import {
   Search,
   UserCircle2,
 } from 'lucide-vue-next'
-import dayjs from 'dayjs'
-import { BasicPage } from '@/components/global-layout'
+import { computed, ref, watch } from 'vue'
 import { getAuditLogs } from '@/api/audit'
-import type { AuditLog } from '@/api/audit/type'
+import { BasicPage } from '@/components/global-layout'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(false)
@@ -32,16 +32,18 @@ const fetchLogs = async () => {
     const res = await getAuditLogs({
       page: page.value,
       page_size: pageSize.value,
-      resource: resourceFilter.value.trim() || undefined
+      resource: resourceFilter.value.trim() || undefined,
     })
 
     if (res.code === 200) {
       logs.value = res.data.logs
       total.value = res.data.total
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to fetch audit logs', error)
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -98,7 +100,11 @@ function getResourceLabel(log: AuditLog) {
 function getActionTone(action: string) {
   const normalized = action.toLowerCase()
 
-  if (normalized.includes('delete') || normalized.includes('remove') || normalized.includes('reject')) {
+  if (normalized.includes('unlock')) {
+    return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-300'
+  }
+
+  if (normalized.includes('delete') || normalized.includes('remove') || normalized.includes('reject') || normalized.includes('lock')) {
     return 'bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-300'
   }
 
@@ -141,8 +147,8 @@ function handleExport() {
     ...rows.map(row =>
       headers
         .map(header => `"${String(row[header as keyof typeof row]).replace(/"/g, '""')}"`)
-        .join(',')
-    )
+        .join(','),
+    ),
   ].join('\n')
 
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
@@ -161,11 +167,11 @@ function handleExport() {
   <BasicPage title="操作日志" description="查看系统所有操作的审计记录">
     <template #actions>
       <div class="flex gap-2">
-        <UiButton variant="outline" size="sm" @click="handleRefresh" :disabled="loading">
+        <UiButton variant="outline" size="sm" :disabled="loading" @click="handleRefresh">
           <RotateCcw class="mr-1 h-4 w-4" :class="{ 'animate-spin': loading }" />
           刷新
         </UiButton>
-        <UiButton variant="outline" size="sm" @click="handleExport" :disabled="logs.length === 0">
+        <UiButton variant="outline" size="sm" :disabled="logs.length === 0" @click="handleExport">
           <Download class="mr-1 h-4 w-4" />
           导出当前页
         </UiButton>
@@ -186,11 +192,11 @@ function handleExport() {
               />
             </div>
 
-            <UiButton variant="outline" @click="applyFilter" :disabled="loading">
+            <UiButton variant="outline" :disabled="loading" @click="applyFilter">
               查询
             </UiButton>
 
-            <UiButton v-if="hasFilter" variant="ghost" @click="resetFilter" :disabled="loading">
+            <UiButton v-if="hasFilter" variant="ghost" :disabled="loading" @click="resetFilter">
               清空
             </UiButton>
           </div>
@@ -215,11 +221,21 @@ function handleExport() {
             <UiTable>
               <UiTableHeader class="bg-muted/30">
                 <UiTableRow class="hover:bg-transparent">
-                  <UiTableHead class="w-[180px]">时间</UiTableHead>
-                  <UiTableHead class="w-[220px]">操作人</UiTableHead>
-                  <UiTableHead class="min-w-[360px]">操作内容</UiTableHead>
-                  <UiTableHead class="w-[220px]">操作对象</UiTableHead>
-                  <UiTableHead class="w-[140px] text-right">IP 地址</UiTableHead>
+                  <UiTableHead class="w-[180px]">
+                    时间
+                  </UiTableHead>
+                  <UiTableHead class="w-[220px]">
+                    操作人
+                  </UiTableHead>
+                  <UiTableHead class="min-w-[360px]">
+                    操作内容
+                  </UiTableHead>
+                  <UiTableHead class="w-[220px]">
+                    操作对象
+                  </UiTableHead>
+                  <UiTableHead class="w-[140px] text-right">
+                    IP 地址
+                  </UiTableHead>
                 </UiTableRow>
               </UiTableHeader>
               <UiTableBody>
@@ -254,8 +270,12 @@ function handleExport() {
                           </UiAvatarFallback>
                         </UiAvatar>
                         <div class="min-w-0">
-                          <p class="truncate text-sm font-semibold">{{ getOperatorName(log) }}</p>
-                          <p class="truncate text-xs text-muted-foreground">{{ getOperatorHint(log) }}</p>
+                          <p class="truncate text-sm font-semibold">
+                            {{ getOperatorName(log) }}
+                          </p>
+                          <p class="truncate text-xs text-muted-foreground">
+                            {{ getOperatorHint(log) }}
+                          </p>
                         </div>
                       </div>
                     </UiTableCell>
@@ -297,7 +317,9 @@ function handleExport() {
                         <Activity class="h-6 w-6 text-muted-foreground/50" />
                       </div>
                       <div class="space-y-1">
-                        <p class="text-sm font-medium">没有找到匹配的日志记录</p>
+                        <p class="text-sm font-medium">
+                          没有找到匹配的日志记录
+                        </p>
                         <p class="text-sm text-muted-foreground">
                           {{ hasFilter ? '可以尝试缩短筛选关键词，或清空后重新查询。' : '当前还没有可展示的操作日志。' }}
                         </p>

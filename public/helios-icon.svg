@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Helios Auth Icon</title>
+  <desc id="desc">A radiant sun ring around a secure identity shield for the Helios authentication platform.</desc>
+  <defs>
+    <linearGradient id="sun" x1="48" y1="32" x2="208" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7C948"/>
+      <stop offset="0.45" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#0EA5A3"/>
+    </linearGradient>
+    <linearGradient id="core" x1="76" y1="68" x2="184" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7D6"/>
+      <stop offset="0.55" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDFCF8"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="91" y1="78" x2="165" y2="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#153E3B"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <g opacity="0.94">
+    <path d="M128 24v28" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 204v28" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M24 128h28" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M204 128h28" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M54.5 54.5l19.8 19.8" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M181.7 181.7l19.8 19.8" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M201.5 54.5l-19.8 19.8" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M74.3 181.7l-19.8 19.8" stroke="url(#sun)" stroke-width="12" stroke-linecap="round"/>
+  </g>
+
+  <circle cx="128" cy="128" r="78" fill="none" stroke="url(#sun)" stroke-width="14"/>
+  <circle cx="128" cy="128" r="58" fill="url(#core)" filter="url(#soft-shadow)"/>
+
+  <path
+    d="M128 76l42 17v31c0 32.5-17.3 55.4-42 66-24.7-10.6-42-33.5-42-66V93l42-17Z"
+    fill="url(#shield)"
+  />
+  <path
+    d="M128 76l42 17v31c0 32.5-17.3 55.4-42 66-24.7-10.6-42-33.5-42-66V93l42-17Z"
+    fill="none"
+    stroke="#DDFCF8"
+    stroke-opacity="0.75"
+    stroke-width="5"
+    stroke-linejoin="round"
+  />
+
+  <circle cx="128" cy="123" r="14" fill="#FDE68A"/>
+  <path d="M128 137v28" stroke="#FDE68A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M110 104c4.8-8.2 11-12.3 18-12.3s13.2 4.1 18 12.3" fill="none" stroke="#FDE68A" stroke-width="8" stroke-linecap="round"/>
+
+  <path d="M86 93c11-16.5 25.3-24.8 42-24.8S159 76.5 170 93" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
+  <path d="M92 176c10.5 13 22.6 19.5 36 19.5s25.5-6.5 36-19.5" fill="none" stroke="#0EA5A3" stroke-width="5" stroke-linecap="round" opacity="0.45"/>
+</svg>
