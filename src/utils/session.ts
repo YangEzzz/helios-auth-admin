@@ -1,13 +1,13 @@
 let csrfToken = ''
 let bootstrap: Promise<any> | null = null
-const baseURL = (import.meta.env.VITE_APP_API_BASE_URL || '').replace(/\/$/, '')
+export const apiBaseURL = (import.meta.env.VITE_APP_API_BASE_URL || (import.meta.env.PROD ? 'https://helios-api.team-tool.top' : '')).replace(/\/$/, '')
 
 export function clearLegacyAuth() {
   localStorage.removeItem('auth_token')
 }
 
 export async function ssoRequest<T>(path: string, data?: unknown): Promise<T> {
-  const response = await fetch(`${baseURL}/api/sso${path}`, {
+  const response = await fetch(`${apiBaseURL}/api/sso${path}`, {
     method: data === undefined ? 'GET' : 'POST',
     credentials: 'include',
     headers: data === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-Token': await getCSRFToken() },
