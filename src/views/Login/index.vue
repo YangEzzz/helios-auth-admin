@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { reqLogin } from '@/api/user'
 import { useAuthStore } from '@/store/auth'
+import { safeReturnPath } from '@/utils/session'
 
 const router = useRouter()
 const route = useRoute()
@@ -28,7 +29,7 @@ async function handleLogin() {
     toast.success('登录成功')
 
     const redirectParams = route.query?.redirect as string
-    router.push(redirectParams || '/dashboard')
+    router.push(safeReturnPath(redirectParams))
   }
   catch (e: any) {
     toast.error(e.message || '登录失败，请检查账号密码')

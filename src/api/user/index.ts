@@ -5,6 +5,7 @@ import type { ResponseData } from '@/request'
  * 用户及认证相关接口封装 (Axios 版)
  */
 import request from '@/request'
+import { ssoRequest } from '@/utils/session'
 
 const API = {
   LOGIN_URL: '/api/login',
@@ -22,8 +23,9 @@ const API = {
 } as const
 
 // 登录
-export const reqLogin = (data: LoginData) => {
-  return request.post<any, ResponseData<LoginResult>>(API.LOGIN_URL, data)
+export const reqLogin = async (data: LoginData) => {
+  const result = await ssoRequest<{ user: UserInfo }>('/login', data)
+  return { code: 200, message: '登录成功', data: { token: '', user: result.user } } as ResponseData<LoginResult>
 }
 
 // 注册
@@ -38,7 +40,7 @@ export const reqUserInfo = () => {
 
 // 退出登录
 export const reqLogout = () => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.LOGOUT_URL)
+  return ssoRequest('/logout', {})
 }
 
 // 获取用户列表 (带分页)

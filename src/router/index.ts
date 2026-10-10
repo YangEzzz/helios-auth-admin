@@ -2,7 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 import { reqUserInfo } from '@/api/user'
 import { useAuthStore } from '@/store/auth'
-import { getToken } from '@/utils/auth'
+import { sessionInfo } from '@/utils/session'
 
 const adminRoles = ['admin', 'super_admin']
 
@@ -12,6 +12,7 @@ const isAdminRole = (role?: string) => {
 
 // 基础路由 - 不需要权限控制的路由
 const baseRoutes: RouteRecordRaw[] = [
+  { path: '/sso/login', name: 'sso-login', component: () => import('@/views/SSO/Login.vue') },
   // ===== 认证路由（无需登录）=====
   {
     path: '/login',
@@ -104,12 +105,12 @@ const baseRoutes: RouteRecordRaw[] = [
       {
         path: 'sign-in',
         name: 'sign-in',
-        component: () => import('@/views/Auth/SignIn.vue'),
+        redirect: to => ({ path: '/login', query: to.query }),
       },
       {
         path: 'sign-in-2',
         name: 'sign-in-2',
-        component: () => import('@/views/Auth/SignIn2.vue'),
+        redirect: to => ({ path: '/login', query: to.query }),
       },
       {
         path: 'sign-up',
@@ -179,8 +180,21 @@ const whiteList = ['/login', '/register']
 
 // 全局前置守卫：登录鉴权与重定向
 router.beforeEach(async (to, _from, next) => {
+  if (to.path === '/sso/login') {
+    next()
+    return
+  }
   const authStore = useAuthStore()
-  const token = getToken()
+  if (!authStore.initialized) {
+    try {
+      const data = await sessionInfo()
+      authStore.userInfo = data.user
+      authStore.isLogin = !!data.user
+    }
+    catch { authStore.clearSession() }
+    authStore.initialized = true
+  }
+  const token = authStore.isLogin
 
   if (token) {
     if (to.path === '/login' || to.path === '/register') {
@@ -202,7 +216,7 @@ router.beforeEach(async (to, _from, next) => {
         }
         catch {
           // Token 校验失败（后端返回 401 等）
-          authStore.logout()
+          authStore.clearSession()
           next({ path: '/login', query: { redirect: to.fullPath } })
         }
       }

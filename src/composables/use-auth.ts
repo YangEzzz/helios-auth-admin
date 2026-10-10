@@ -1,38 +1,30 @@
-import { storeToRefs } from 'pinia'
-
-import { useAuthStore } from '@/store'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { useAuthStore } from '@/store/auth'
 
 export function useAuth() {
   const router = useRouter()
 
   const authStore = useAuthStore()
-  const { isLogin } = storeToRefs(authStore)
   const loading = ref(false)
 
-  function logout() {
-    isLogin.value = false
-
-    router.push({ path: '/auth/sign-in' })
-  }
-
-  function toHome() {
-    router.push({ path: '/workspace' })
+  async function logout() {
+    if (loading.value)
+      return
+    loading.value = true
+    try {
+      await authStore.logout()
+      await router.push('/login')
+    }
+    catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '退出失败，请重试')
+    }
+    finally { loading.value = false }
   }
 
   async function login() {
-    loading.value = true
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    // mock login
-    isLogin.value = true
-    loading.value = false
-
-    const redirect = router.currentRoute.value.query.redirect as string
-    if (!redirect || redirect.startsWith('//')) {
-      toHome()
-    }
-    else {
-      router.push(redirect)
-    }
+    await router.push({ path: '/login', query: router.currentRoute.value.query })
   }
 
   return {

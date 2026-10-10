@@ -8,7 +8,10 @@ import {
   UserRoundCog,
 } from 'lucide-vue-next'
 
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
-
 import { useAuthStore } from '@/store/auth'
-import { useRouter } from 'vue-router'
 
 // const { user } = defineProps<{ user: User }>()
 
@@ -37,9 +38,17 @@ const user = computed(() => {
   }
 })
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
+const loggingOut = ref(false)
+const handleLogout = async () => {
+  if (loggingOut.value)
+    return
+  loggingOut.value = true
+  try {
+    await authStore.logout()
+    await router.push('/login')
+  }
+  catch (error) { toast.error(error instanceof Error ? error.message : '退出失败，请重试') }
+  finally { loggingOut.value = false }
 }
 </script>
 
@@ -73,12 +82,12 @@ const handleLogout = () => {
         >
           <DropdownMenuLabel class="p-0 font-normal">
             <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar class="size-8 rounded-lg">
-              <AvatarImage :src="user.avatar || ''" :alt="user.name || 'User'" />
-              <AvatarFallback class="rounded-lg font-black bg-primary/10 text-primary">
-                {{ (user.name || 'User').slice(0, 1).toUpperCase() }}
-              </AvatarFallback>
-            </Avatar>
+              <Avatar class="size-8 rounded-lg">
+                <AvatarImage :src="user.avatar || ''" :alt="user.name || 'User'" />
+                <AvatarFallback class="rounded-lg font-black bg-primary/10 text-primary">
+                  {{ (user.name || 'User').slice(0, 1).toUpperCase() }}
+                </AvatarFallback>
+              </Avatar>
               <div class="grid flex-1 text-sm leading-tight text-left">
                 <span class="font-semibold truncate">{{ user.name || 'User' }}</span>
                 <span class="text-xs truncate">{{ user.email || '' }}</span>

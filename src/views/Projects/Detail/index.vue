@@ -39,6 +39,7 @@ import ConfirmDialog from '@/components/confirm-dialog.vue'
 import DataTable from '@/components/data-table/data-table.vue'
 import { BasicPage } from '@/components/global-layout'
 import { columns } from './components/member-columns'
+import SSOClients from './components/SSOClients.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -771,6 +772,7 @@ onMounted(() => {
         </UiDialogFooter>
       </UiDialogContent>
     </UiDialog>
+    <SSOClients v-if="!loading" :project-id="projectId" />
   </BasicPage>
 </template>
 
