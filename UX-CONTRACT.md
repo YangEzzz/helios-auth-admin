@@ -2,14 +2,14 @@
 
 ## Canonical UI Map
 
-| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
-| --- | --- | --- | --- | --- |
-| Form | `src/components/ui/input`, Textarea, Label | DESIGN.md | login / application configuration | browser and build |
-| Toast | vue-sonner and shared Toaster | DESIGN.md | success / error | browser |
-| Scrollbar | existing application stylesheet | DESIGN.md | natural document scroll | narrow browser |
-| Select/Listbox | `src/components/ui/select` | DESIGN.md | authored | existing project role controls |
-| Authentication | `src/utils/session.ts`, auth store | `docs/sso.md` | admin / application login | SSO end-to-end validation |
-| Confirmation | `src/components/ui/alert-dialog` | DESIGN.md | secret rotation | browser |
+| Capability     | Canonical owner                            | Source of truth | Allowed variants                  | Verification                   |
+| -------------- | ------------------------------------------ | --------------- | --------------------------------- | ------------------------------ |
+| Form           | `src/components/ui/input`, Textarea, Label | DESIGN.md       | login / application configuration | browser and build              |
+| Toast          | vue-sonner and shared Toaster              | DESIGN.md       | success / error                   | browser                        |
+| Scrollbar      | existing application stylesheet            | DESIGN.md       | natural document scroll           | narrow browser                 |
+| Select/Listbox | `src/components/ui/select`                 | DESIGN.md       | authored                          | existing project role controls |
+| Authentication | `src/utils/session.ts`, auth store         | `docs/sso.md`   | admin / application login         | SSO end-to-end validation      |
+| Confirmation   | `src/components/ui/alert-dialog`           | DESIGN.md       | secret rotation                   | browser                        |
 
 ## Authentication
 
@@ -20,3 +20,13 @@
 - Administrator logout revokes the Helios session before clearing UI state. Business applications keep independent sessions.
 - Application secrets are only stored in backend configuration; the admin UI shows a new secret masked and only until the page is left.
 - Every popup message is advisory; the business backend owns the final authentication state.
+
+## Administrative data and mutations
+
+- Chinese is the production administrative UI language; shared pagination and dismissal labels follow it. Demo routes remain development-only.
+- `use-latest-query` owns list request order and retryable errors. `use-project-resources` owns project reads; `use-request-scope` binds asynchronous work to the current route and component lifetime.
+- `confirm-dialog` retains context while busy or after failure; its business caller closes it after success. `use-discard-confirmation` owns unsaved project setting dismissal.
+- `lib/accounts` owns administrative role labels and allowed account status affordances. Every mutation rechecks capability and busy state before sending.
+- `generateVueTable` owns table state, pagination callbacks and stable row identity. Narrow screens scroll inside the table container.
+- `query-error` owns recoverable load failures; failed initial loads are not labeled empty. SSO configuration cannot be edited before its directory is successfully read.
+- Browser regression fixture lives in `tests/regression.html`; it intercepts business requests and does not access real account data.

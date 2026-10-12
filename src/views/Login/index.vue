@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { reqLogin } from '@/api/user'
+import { errorMessage } from '@/lib/errors'
 import { useAuthStore } from '@/store/auth'
 import { safeReturnPath } from '@/utils/session'
 
@@ -31,8 +32,8 @@ async function handleLogin() {
     const redirectParams = route.query?.redirect as string
     router.push(safeReturnPath(redirectParams))
   }
-  catch (e: any) {
-    toast.error(e.message || '登录失败，请检查账号密码')
+  catch (e: unknown) {
+    toast.error(errorMessage(e) || '登录失败，请检查账号密码')
   }
   finally {
     loading.value = false

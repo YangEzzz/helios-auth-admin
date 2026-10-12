@@ -44,6 +44,8 @@ export interface UserInfo {
   name: string
   email: string
   role: string
+  department?: string
+  reason?: string
   avatar?: string
   status?: string
   created_at?: string

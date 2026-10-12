@@ -1,5 +1,6 @@
 import type { ListUserResult, LoginData, LoginResult, RegisterData, RegisterResult, UserInfo } from './type'
 import type { ResponseData } from '@/request'
+import { collectUsers } from '@/lib/paged-users'
 /**
  * src/api/user/index.ts
  * 用户及认证相关接口封装 (Axios 版)
@@ -30,12 +31,12 @@ export const reqLogin = async (data: LoginData) => {
 
 // 注册
 export const reqRegister = (data: RegisterData) => {
-  return request.post<any, ResponseData<RegisterResult>>(API.REGISTER_URL, data)
+  return request.post<unknown, ResponseData<RegisterResult>>(API.REGISTER_URL, data)
 }
 
 // 获取当前用户信息
 export const reqUserInfo = () => {
-  return request.get<any, ResponseData<UserInfo>>(API.USER_INFO_URL)
+  return request.get<unknown, ResponseData<UserInfo>>(API.USER_INFO_URL)
 }
 
 // 退出登录
@@ -45,34 +46,34 @@ export const reqLogout = () => {
 
 // 获取用户列表 (带分页)
 export const reqUserList = (params: { page: number, page_size: number }) => {
-  return request.get<any, ResponseData<ListUserResult>>(API.USER_LIST_URL, { params })
+  return request.get<unknown, ResponseData<ListUserResult>>(API.USER_LIST_URL, { params })
 }
 
 // 审批用户通过
 export const reqApproveUser = (id: string) => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.APPROVE_USER_URL, { id })
+  return request.post<unknown, ResponseData<Record<string, never>>>(API.APPROVE_USER_URL, { id })
 }
 
 // 拒绝注册申请
 export const reqRejectUser = (id: string) => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.REJECT_USER_URL, { id })
+  return request.post<unknown, ResponseData<Record<string, never>>>(API.REJECT_USER_URL, { id })
 }
 
 // 锁定已注册用户
 export const reqLockUser = (id: string) => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.LOCK_USER_URL, { id })
+  return request.post<unknown, ResponseData<Record<string, never>>>(API.LOCK_USER_URL, { id })
 }
 
 // 解锁已注册用户
 export const reqUnlockUser = (id: string) => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.UNLOCK_USER_URL, { id })
+  return request.post<unknown, ResponseData<Record<string, never>>>(API.UNLOCK_USER_URL, { id })
 }
 
 /**
  * 更新用户全局角色
  */
 export const reqSetUserRole = (data: { target_user_id: string, new_role: string }) => {
-  return request.post<any, ResponseData<Record<string, never>>>(API.SET_ROLE_URL, data)
+  return request.post<unknown, ResponseData<Record<string, never>>>(API.SET_ROLE_URL, data)
 }
 
 /**
@@ -83,7 +84,7 @@ export const reqSetUserRole = (data: { target_user_id: string, new_role: string 
 export const reqUploadAvatar = (file: File) => {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post<any, ResponseData<{ url: string }>>(API.UPLOAD_AVATAR_URL, formData, {
+  return request.post<unknown, ResponseData<{ url: string }>>(API.UPLOAD_AVATAR_URL, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
@@ -92,5 +93,7 @@ export const reqUploadAvatar = (file: File) => {
  * 保存头像 URL 到数据库
  */
 export const reqSaveAvatar = (avatar: string) => {
-  return request.post<any, ResponseData<{ avatar: string }>>(API.UPDATE_AVATAR_URL, { avatar })
+  return request.post<unknown, ResponseData<{ avatar: string }>>(API.UPDATE_AVATAR_URL, { avatar })
 }
+
+export const fetchUserDirectory = () => collectUsers(async page => (await reqUserList({ page, page_size: 100 })).data)

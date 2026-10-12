@@ -27,7 +27,7 @@ function getFlatNavItems(navData: NavGroup[]): NavItem[] {
   return flatItems
 }
 
-const commands = getFlatNavItems([...navData.value!, ...otherPages.value!])
+const commands = computed(() => getFlatNavItems([...navData.value, ...otherPages.value]))
 
 const router = useRouter()
 const route = useRoute()
@@ -40,7 +40,7 @@ function commandItemClick(url: string) {
 </script>
 
 <template>
-  <CommandGroup heading="Pages">
+  <CommandGroup heading="页面">
     <CommandItem
       v-for="command in commands"
       :key="command.title"

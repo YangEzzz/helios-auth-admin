@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import type { UserRow } from './components/columns'
+import type { UserInfo } from '@/api/user/type'
 import {
   Activity,
   Search,
 } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { reqLockUser, reqSetUserRole, reqUnlockUser, reqUserList } from '@/api/user'
+import { fetchUserDirectory, reqLockUser, reqSetUserRole, reqUnlockUser } from '@/api/user'
 import ConfirmDialog from '@/components/confirm-dialog.vue'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+import { useAdminAccess } from '@/composables/use-admin-access'
+import { useLatestQuery } from '@/composables/use-latest-query'
+import { accountStatusAction } from '@/lib/accounts'
+import { errorMessage } from '@/lib/errors'
 import { useAuthStore } from '@/store/auth'
 import { columns } from './components/columns'
 import UserTable from './components/data-table.vue'
@@ -17,38 +23,24 @@ const authStore = useAuthStore()
 const currentUserId = computed(() => authStore.userInfo?.id)
 
 // 状态管理
-const loading = ref(false)
-const rawUsers = ref<any[]>([])
+const { canManage } = useAdminAccess()
+const { data: rawUsers, loading, error: loadError, refresh: fetchUsers } = useLatestQuery<UserInfo[]>(fetchUserDirectory, [])
 const searchQuery = ref('')
 const roleFilter = ref('all')
 const statusFilter = ref('all')
 
 // 1. 获取列表
-async function fetchUsers() {
-  loading.value = true
-  try {
-    const res = await reqUserList({ page: 1, page_size: 100 })
-    rawUsers.value = res.data.users
-  }
-  catch {
-    toast.error('获取列表失败')
-  }
-  finally {
-    loading.value = false
-  }
-}
-
 // 2. 只有“非待审批”的用户才会出现在在这个列表（恢复过滤）
 const users = computed<UserRow[]>(() => {
   return rawUsers.value
-    .filter((u: any) => u.status !== 'pending_approval')
-    .map((u: any) => ({
+    .filter(u => u.status !== 'pending_approval')
+    .map(u => ({
       id: u.id,
       name: u.name || '未命名',
       email: u.email,
       department: u.department || '未分配',
       role: u.role || 'user',
-      status: u.status || 'active',
+      status: u.status || 'unknown',
       createdAt: u.created_at ? new Date(u.created_at).toLocaleDateString() : '未知',
     }))
 })
@@ -62,7 +54,7 @@ const filteredUsers = computed(() => {
       || user.department.toLowerCase().includes(keyword)
     const matchesRole = roleFilter.value === 'all' || user.role === roleFilter.value
     const matchesStatus = statusFilter.value === 'all'
-      || (statusFilter.value === 'locked' ? user.status !== 'active' : user.status === statusFilter.value)
+      || (user.status === statusFilter.value)
     return matchesKeyword && matchesRole && matchesStatus
   })
 })
@@ -70,18 +62,22 @@ const filteredUsers = computed(() => {
 // 3. 各种操作回调
 const isStatusDialogOpen = ref(false)
 const changingStatus = ref(false)
+const statusError = ref('')
 const pendingStatusUser = ref<UserRow | null>(null)
-const pendingStatusAction = computed(() => pendingStatusUser.value?.status === 'active' ? 'lock' : 'unlock')
+const pendingStatusAction = computed(() => accountStatusAction(pendingStatusUser.value?.status))
 
 function handleToggleStatus(user: UserRow) {
+  if (!canManage() || !accountStatusAction(user.status) || user.id === currentUserId.value)
+    return
   pendingStatusUser.value = user
   isStatusDialogOpen.value = true
 }
 
 async function handleConfirmStatusChange() {
-  if (!pendingStatusUser.value)
+  if (!canManage() || changingStatus.value || !pendingStatusUser.value || !pendingStatusAction.value)
     return
 
+  statusError.value = ''
   changingStatus.value = true
   try {
     if (pendingStatusAction.value === 'lock') {
@@ -92,10 +88,12 @@ async function handleConfirmStatusChange() {
       await reqUnlockUser(pendingStatusUser.value.id)
       toast.success('用户已解锁')
     }
+    isStatusDialogOpen.value = false
     pendingStatusUser.value = null
     await fetchUsers()
   }
-  catch {
+  catch (cause) {
+    statusError.value = errorMessage(cause)
     toast.error('操作失败')
   }
   finally {
@@ -107,8 +105,11 @@ async function handleConfirmStatusChange() {
 const isRoleDialogOpen = ref(false)
 const roleForm = reactive({ target_user_id: '', new_role: 'user', target_username: '' })
 const settingRole = ref(false)
+const roleError = ref('')
 
-function openRoleDialog(user: any) {
+function openRoleDialog(user: UserRow) {
+  if (!canManage())
+    return
   roleForm.target_user_id = user.id
   roleForm.target_username = user.name
   roleForm.new_role = user.role
@@ -116,6 +117,9 @@ function openRoleDialog(user: any) {
 }
 
 async function handleSetRole() {
+  if (!canManage() || settingRole.value || !roleForm.target_user_id)
+    return
+  roleError.value = ''
   settingRole.value = true
   try {
     await reqSetUserRole({
@@ -126,8 +130,9 @@ async function handleSetRole() {
     isRoleDialogOpen.value = false
     await fetchUsers()
   }
-  catch (e: any) {
-    toast.error(e.message || '更新失败')
+  catch (e: unknown) {
+    roleError.value = errorMessage(e)
+    toast.error(roleError.value)
   }
   finally {
     settingRole.value = false
@@ -141,6 +146,7 @@ onMounted(() => {
 
 <template>
   <BasicPage title="成员管理" description="管理系统已注册的账户与权限分配">
+    <QueryError v-if="loadError" :message="loadError" @retry="fetchUsers" />
     <section class="mt-4 rounded-2xl border border-border/60 bg-card p-4">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -160,9 +166,9 @@ onMounted(() => {
         <div class="flex flex-col gap-2 sm:flex-row lg:items-center">
           <div class="relative sm:w-72">
             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <UiInput v-model="searchQuery" class="h-10 rounded-xl pl-9" placeholder="搜索姓名、邮箱或部门" />
+            <UiInput v-model="searchQuery" aria-label="搜索账户" class="h-10 rounded-xl pl-9" placeholder="搜索姓名、邮箱或部门" />
           </div>
-          <UiButton variant="outline" size="icon" :disabled="loading" class="h-10 w-10 rounded-xl" @click="fetchUsers">
+          <UiButton variant="outline" size="icon" :disabled="loading" aria-label="刷新成员列表" class="h-10 w-10 rounded-xl" @click="fetchUsers">
             <Activity class="h-4 w-4" :class="[loading ? 'animate-spin' : '']" />
           </UiButton>
         </div>
@@ -173,6 +179,7 @@ onMounted(() => {
           v-for="item in [
             { label: '全部角色', value: 'all' },
             { label: '管理员', value: 'admin' },
+            { label: '超级管理员', value: 'super_admin' },
             { label: '正式成员', value: 'user' },
           ]"
           :key="item.value"
@@ -204,7 +211,7 @@ onMounted(() => {
         :data="filteredUsers"
         :columns="columns"
         :loading="loading"
-        :current-user-id="currentUserId"
+        :busy="changingStatus || settingRole" :current-user-id="currentUserId"
         @edit-role="openRoleDialog"
         @delete="handleToggleStatus"
       />
@@ -239,6 +246,9 @@ onMounted(() => {
             </UiSelect>
           </div>
         </div>
+        <p v-if="roleError" class="text-sm text-destructive" role="alert">
+          {{ roleError }}
+        </p>
         <UiDialogFooter>
           <UiButton variant="outline" @click="isRoleDialogOpen = false">
             取消
@@ -256,7 +266,7 @@ onMounted(() => {
       cancel-button-text="取消"
       :confirm-button-text="pendingStatusAction === 'lock' ? '锁定用户' : '解锁用户'"
       :destructive="pendingStatusAction === 'lock'"
-      :is-loading="changingStatus"
+      :error="statusError" :is-loading="changingStatus"
       @confirm="handleConfirmStatusChange"
     >
       <template #title>

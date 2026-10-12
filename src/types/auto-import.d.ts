@@ -63,17 +63,23 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const useAdminAccess: typeof import('../composables/use-admin-access').useAdminAccess
   const useAttrs: typeof import('vue').useAttrs
   const useAuth: typeof import('../composables/use-auth').useAuth
   const useAuthStore: typeof import('../store/auth').useAuthStore
   const useAxios: typeof import('../composables/use-axios').useAxios
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
+  const useDiscardConfirmation: typeof import('../composables/use-discard-confirmation').useDiscardConfirmation
   const useId: typeof import('vue').useId
+  const useLatestQuery: typeof import('../composables/use-latest-query').useLatestQuery
   const useModal: typeof import('../composables/use-modal').useModal
   const useModel: typeof import('vue').useModel
+  const useProjectResources: typeof import('../composables/use-project-resources').useProjectResources
+  const useRequestScope: typeof import('../composables/use-request-scope').useRequestScope
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
+  const useSSOClients: typeof import('../composables/use-sso-clients').useSSOClients
   const useSidebar: typeof import('../composables/use-sidebar').useSidebar
   const useSlots: typeof import('vue').useSlots
   const useSystemTheme: typeof import('../composables/use-system-theme').useSystemTheme

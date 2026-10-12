@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import type { AuditLog } from '@/api/audit/type'
-// Tanstack Table 相关
-import {
-  getCoreRowModel,
-  useVueTable,
-} from '@tanstack/vue-table'
+import type { ProjectMemberRow } from './components/member-columns'
 import {
   Activity,
   ArrowLeft,
@@ -19,45 +14,40 @@ import {
   UserCheck,
   Users,
 } from 'lucide-vue-next'
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
   reqAddProjectMember,
   reqAddProjectRoleTemplate,
-  reqProjectAuditLogs,
-  reqProjectDetail,
-  reqProjectMembers,
-  reqProjectRoleTemplates,
   reqRemoveProjectMember,
   reqUpdateProject,
   reqUpdateProjectMemberRole,
 } from '@/api/project'
-
-import { reqUserList } from '@/api/user'
 import ConfirmDialog from '@/components/confirm-dialog.vue'
 import DataTable from '@/components/data-table/data-table.vue'
+import { generateVueTable } from '@/components/data-table/use-generate-vue-table'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+
+import { useAdminAccess } from '@/composables/use-admin-access'
+import { useDiscardConfirmation } from '@/composables/use-discard-confirmation'
+import { useProjectResources } from '@/composables/use-project-resources'
+import { errorMessage } from '@/lib/errors'
 import { columns } from './components/member-columns'
+import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue'
 import SSOClients from './components/SSOClients.vue'
 
 const router = useRouter()
 const route = useRoute()
-const projectId = route.params.id as string
+const projectId = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
+const { canManage } = useAdminAccess()
+const { projectScope, errors, loading, membersLoading, rolesLoading, auditLoading, project, members, roleTemplates, auditLogs, allUsers, fetchMembers, fetchRoleTemplates, fetchAuditLogs, refreshProject, reset } = useProjectResources(projectId)
 
 // --- 状态管理 ---
-const loading = ref(true)
-const membersLoading = ref(false)
-const rolesLoading = ref(false)
-const auditLoading = ref(false)
 const activeTab = ref('members') // members | audit
 const isSettingsDialogOpen = ref(false)
 
-const project = ref<any>({ name: '加载中...', description: '', project_id_string: '--', project_url: '' })
-const members = ref<any[]>([])
-const roleTemplates = ref<any[]>([])
-const auditLogs = ref<AuditLog[]>([])
-const allUsers = ref<any[]>([])
 const assignedUserIds = computed(() => new Set(members.value.map(member => member.user_id)))
 const availableUsers = computed(() => {
   return allUsers.value.filter(user => user.status === 'active' && !assignedUserIds.value.has(user.id))
@@ -73,25 +63,10 @@ const settingsForm = reactive({ project_name: '', project_url: '', description: 
 const savingSettings = ref(false)
 
 // --- 1. 获取项目详情 ---
-async function fetchProjectDetail() {
-  loading.value = true
-  try {
-    const res = await reqProjectDetail(projectId)
-    project.value = res.data.project
-    settingsForm.project_name = res.data.project.project_name || ''
-    settingsForm.project_url = res.data.project.project_url || ''
-    settingsForm.description = res.data.project.description || ''
-  }
-  catch {
-    toast.error('获取项目详情失败')
-    router.push('/projects')
-  }
-  finally {
-    loading.value = false
-  }
-}
 
 function openProjectSettings() {
+  if (!canManage())
+    return
   settingsForm.project_name = project.value.project_name || ''
   settingsForm.project_url = project.value.project_url || ''
   settingsForm.description = project.value.description || ''
@@ -99,6 +74,10 @@ function openProjectSettings() {
 }
 
 async function handleUpdateProject() {
+  if (!canManage() || savingSettings.value)
+    return
+  const ticket = projectScope.capture()
+  errors.handleUpdateProject = ''
   if (!settingsForm.project_name.trim()) {
     toast.error('项目名称不能为空')
     return
@@ -107,11 +86,15 @@ async function handleUpdateProject() {
   savingSettings.value = true
   try {
     const res = await reqUpdateProject({
-      id: projectId,
+      id: ticket.context,
       project_name: settingsForm.project_name.trim(),
       project_url: settingsForm.project_url.trim(),
       description: settingsForm.description.trim(),
     })
+    if (!ticket.isCurrent())
+      return
+    if (!res.data.project)
+      throw new Error('服务器未返回项目资料')
     project.value = res.data.project
     settingsForm.project_name = res.data.project?.project_name || ''
     settingsForm.project_url = res.data.project?.project_url || ''
@@ -120,8 +103,11 @@ async function handleUpdateProject() {
     toast.success('项目资料已更新')
     await fetchAuditLogs()
   }
-  catch (e: any) {
-    toast.error(e.message || '保存失败')
+  catch (cause) {
+    if (!ticket.isCurrent())
+      return
+    errors.handleUpdateProject = errorMessage(cause)
+    toast.error(errorMessage(cause) || '保存失败')
   }
   finally {
     savingSettings.value = false
@@ -129,88 +115,36 @@ async function handleUpdateProject() {
 }
 
 // --- 2. 获取项目成员 ---
-async function fetchMembers() {
-  membersLoading.value = true
-  try {
-    const res = await reqProjectMembers(projectId)
-    members.value = res.data.members.map(m => ({
-      id: m.id,
-      user_id: m.user_id,
-      name: m.user?.name || '未知',
-      email: m.user?.email || '',
-      role: m.role_in_project || 'guest',
-      joined_at: m.created_at ? new Date(m.created_at).toLocaleDateString() : '--',
-    }))
-  }
-  catch (e: any) {
-    toast.error(e.message || '获取项目成员失败')
-  }
-  finally {
-    membersLoading.value = false
-  }
-}
 
 // --- 3. 获取角色模板 ---
-async function fetchRoleTemplates() {
-  rolesLoading.value = true
-  try {
-    const res = await reqProjectRoleTemplates(projectId)
-    roleTemplates.value = res.data.role_templates
-  }
-  catch (e: any) {
-    toast.error(e.message || '获取角色模板失败')
-  }
-  finally {
-    rolesLoading.value = false
-  }
-}
 
 // --- 4. 获取审计日志 ---
-async function fetchAuditLogs() {
-  auditLoading.value = true
-  try {
-    const res = await reqProjectAuditLogs(projectId)
-    auditLogs.value = res.data.logs
-  }
-  catch (e: any) {
-    toast.error(e.message || '获取项目审计日志失败')
-  }
-  finally {
-    auditLoading.value = false
-  }
-}
 
 // --- 表格逻辑 ---
-const table = useVueTable({
-  get data() { return members.value },
-  columns,
-  getCoreRowModel: getCoreRowModel(),
-  meta: {
-    onRemoveMember: (userId: string) => {
-      pendingRemoveMemberId.value = userId
-      isRemoveMemberDialogOpen.value = true
-    },
-    onEditRole: (member: any) => {
-      roleEditForm.user_id = member.user_id
-      roleEditForm.role = member.role
-      isEditRoleDialogOpen.value = true
-    },
-  },
-})
 
 async function handleConfirmRemoveMember() {
+  if (!canManage() || removingMember.value)
+    return
+  const ticket = projectScope.capture()
+  errors.handleConfirmRemoveMember = ''
   if (!pendingRemoveMemberId.value)
     return
 
   removingMember.value = true
   try {
-    await reqRemoveProjectMember({ project_id: projectId, user_id: pendingRemoveMemberId.value })
+    await reqRemoveProjectMember({ project_id: ticket.context, user_id: pendingRemoveMemberId.value })
+    if (!ticket.isCurrent())
+      return
     toast.success('成员已移除')
+    isRemoveMemberDialogOpen.value = false
     pendingRemoveMemberId.value = ''
     await fetchMembers()
     await fetchAuditLogs()
   }
-  catch {
+  catch (cause) {
+    if (!ticket.isCurrent())
+      return
+    errors.handleConfirmRemoveMember = errorMessage(cause)
     toast.error('移除失败')
   }
   finally {
@@ -219,26 +153,23 @@ async function handleConfirmRemoveMember() {
 }
 
 // --- 其余业务逻辑 ---
-async function fetchAllUsers() {
-  try {
-    const res = await reqUserList({ page: 1, page_size: 1000 })
-    allUsers.value = res.data.users
-  }
-  catch (e: any) {
-    console.error('Fetch all users failed', e)
-  }
-}
 
 const isAddMemberDialogOpen = ref(false)
 const addForm = reactive({ user_id: '', role: '' })
 const adding = ref(false)
 
 async function handleAddMember() {
+  if (!canManage() || adding.value)
+    return
+  const ticket = projectScope.capture()
+  errors.handleAddMember = ''
   if (!addForm.user_id || !addForm.role)
     return toast.error('请选择用户和角色')
   adding.value = true
   try {
-    await reqAddProjectMember({ project_id: projectId, ...addForm })
+    await reqAddProjectMember({ project_id: ticket.context, ...addForm })
+    if (!ticket.isCurrent())
+      return
     toast.success('成员已加入项目')
     isAddMemberDialogOpen.value = false
     addForm.user_id = ''
@@ -246,8 +177,11 @@ async function handleAddMember() {
     await fetchMembers()
     await fetchAuditLogs()
   }
-  catch (e: any) {
-    toast.error(e.message || '添加失败')
+  catch (cause) {
+    if (!ticket.isCurrent())
+      return
+    errors.handleAddMember = errorMessage(cause)
+    toast.error(errorMessage(cause) || '添加失败')
   }
   finally {
     adding.value = false
@@ -255,15 +189,24 @@ async function handleAddMember() {
 }
 
 async function handleUpdateRole() {
+  if (!canManage() || editingRole.value)
+    return
+  const ticket = projectScope.capture()
+  errors.handleUpdateRole = ''
   editingRole.value = true
   try {
-    await reqUpdateProjectMemberRole({ project_id: projectId, ...roleEditForm })
+    await reqUpdateProjectMemberRole({ project_id: ticket.context, ...roleEditForm })
+    if (!ticket.isCurrent())
+      return
     toast.success('角色更新成功')
     isEditRoleDialogOpen.value = false
     await fetchMembers()
     await fetchAuditLogs()
   }
-  catch {
+  catch (cause) {
+    if (!ticket.isCurrent())
+      return
+    errors.handleUpdateRole = errorMessage(cause)
     toast.error('修改失败')
   }
   finally {
@@ -276,17 +219,26 @@ const roleTemplateForm = reactive({ role_name: '', description: '' })
 const addingTemplate = ref(false)
 
 async function handleAddRoleTemplate() {
+  if (!canManage() || addingTemplate.value)
+    return
+  const ticket = projectScope.capture()
+  errors.handleAddRoleTemplate = ''
   if (!roleTemplateForm.role_name)
     return toast.error('角色名必填')
   addingTemplate.value = true
   try {
-    await reqAddProjectRoleTemplate({ project_id: projectId, ...roleTemplateForm })
+    await reqAddProjectRoleTemplate({ project_id: ticket.context, ...roleTemplateForm })
+    if (!ticket.isCurrent())
+      return
     toast.success('角色模板定义成功')
     isAddRoleTemplateDialogOpen.value = false
     await fetchRoleTemplates()
     await fetchAuditLogs()
   }
-  catch {
+  catch (cause) {
+    if (!ticket.isCurrent())
+      return
+    errors.handleAddRoleTemplate = errorMessage(cause)
     toast.error('定义失败')
   }
   finally {
@@ -311,34 +263,82 @@ function formatAction(action: string) {
 const stats = computed(() => [
   { label: '项目成员', value: members.value.length.toString(), icon: Users, color: 'text-primary' },
   { label: '自定义角色', value: roleTemplates.value.length.toString(), icon: ShieldCheck, color: 'text-primary' },
-  { label: '最近操作', value: auditLogs.value.length > 0 ? formatAction(auditLogs.value[0].action) : '--', icon: History, color: 'text-primary' },
+  { label: '最近操作', value: auditLogs.value.length > 0 ? formatAction(auditLogs.value[0]?.action || '') : '--', icon: History, color: 'text-primary' },
   { label: '系统状态', value: '正常', icon: Globe, color: 'text-primary' },
 ])
 
-onMounted(() => {
-  fetchProjectDetail()
-  fetchMembers()
-  fetchRoleTemplates()
-  fetchAuditLogs()
-  fetchAllUsers()
+const operationBusy = computed(() => savingSettings.value || removingMember.value || adding.value || editingRole.value || addingTemplate.value)
+const table = generateVueTable({
+  get data() { return members.value },
+  columns,
+  get meta() {
+    return {
+      canManage,
+      get busy() { return operationBusy.value },
+      onRemoveMember: (userId: string) => {
+        if (!canManage())
+          return
+        pendingRemoveMemberId.value = userId
+        isRemoveMemberDialogOpen.value = true
+      },
+      onEditRole: (member: ProjectMemberRow) => {
+        if (!canManage())
+          return
+        roleEditForm.user_id = member.user_id
+        roleEditForm.role = member.role
+        isEditRoleDialogOpen.value = true
+      },
+    }
+  },
 })
+
+const isDirty = computed(() => (isSettingsDialogOpen.value && (settingsForm.project_name !== project.value.project_name || settingsForm.description !== project.value.description || settingsForm.project_url !== (project.value.project_url || ''))) || (isAddMemberDialogOpen.value && Boolean(addForm.user_id || addForm.role)) || (isEditRoleDialogOpen.value && Boolean(roleEditForm.user_id)) || (isAddRoleTemplateDialogOpen.value && Boolean(roleTemplateForm.role_name || roleTemplateForm.description)))
+const { showDiscardDialog, confirmDiscard, resolveDiscard } = useDiscardConfirmation(() => isDirty.value)
+async function canLeaveProject() {
+  if (operationBusy.value) {
+    toast.info('请等待当前操作完成')
+    return false
+  }
+  return confirmDiscard()
+}
+async function closeSettings() {
+  if (!savingSettings.value && await confirmDiscard())
+    isSettingsDialogOpen.value = false
+}
+onBeforeRouteLeave(canLeaveProject)
+onBeforeRouteUpdate(async (to, from) => to.params.id === from.params.id || await canLeaveProject())
+watch(projectId, () => {
+  reset()
+  isSettingsDialogOpen.value = false
+  isRemoveMemberDialogOpen.value = false
+  isAddMemberDialogOpen.value = false
+  isEditRoleDialogOpen.value = false
+  isAddRoleTemplateDialogOpen.value = false
+  members.value = []
+  roleTemplates.value = []
+  auditLogs.value = []
+  allUsers.value = []
+  refreshProject()
+}, { flush: 'sync' })
+onMounted(refreshProject)
 </script>
 
 <template>
-  <BasicPage :title="`项目：${project.project_name || project.name || '详情'}`" :description="project.description || '项目暂无详细描述信息'">
+  <BasicPage :title="`项目：${project.project_name || '详情'}`" :description="project.description || '项目暂无详细描述信息'">
     <template #actions>
       <UiButton variant="outline" size="sm" @click="router.back()">
         <ArrowLeft class="h-4 w-4 mr-2" /> 返回列表
       </UiButton>
-      <UiButton size="sm" variant="secondary" :disabled="loading" class="shadow-none border border-border/60" @click="openProjectSettings">
+      <UiButton size="sm" variant="secondary" :disabled="!canManage() || operationBusy || loading || Boolean(errors.fetchProjectDetail)" class="shadow-none border border-border/60" @click="openProjectSettings">
         <Settings class="h-3 w-3 mr-2" /> 设置
       </UiButton>
     </template>
 
+    <QueryError v-for="(message, key) in errors" v-show="message" :key="key" :message="message" @retry="refreshProject" />
     <div v-if="loading" class="flex flex-col items-center justify-center py-40">
       <div class="h-14 w-14 rounded-full border-4 border-primary/10 border-t-primary animate-spin mb-6" />
       <p class="text-[10px] text-muted-foreground tracking-[0.3em] uppercase font-black">
-        Decrypting Project Vault...
+        正在加载项目资料…
       </p>
     </div>
 
@@ -364,13 +364,13 @@ onMounted(() => {
       </div>
 
       <div class="grid gap-6 md:grid-cols-3">
-        <div class="md:col-span-2 space-y-6">
+        <div class="md:col-span-2 min-w-0 space-y-6">
           <!-- Main Content Card with Tabs -->
           <UiCard class="border-border/40 shadow-sm relative overflow-hidden group">
             <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
               <Users class="h-32 w-32 rotate-12" />
             </div>
-            <UiCardHeader class="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-2 relative z-10">
               <div>
                 <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
                   <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
@@ -440,6 +440,9 @@ onMounted(() => {
                         </UiSelect>
                       </div>
                     </div>
+                    <p v-if="errors.handleAddMember" class="text-sm text-destructive" role="alert">
+                      {{ errors.handleAddMember }}
+                    </p>
                     <UiDialogFooter>
                       <UiButton variant="outline" @click="isAddMemberDialogOpen = false">
                         取消
@@ -514,7 +517,7 @@ onMounted(() => {
             <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
               <ShieldCheck class="h-32 w-32 rotate-12" />
             </div>
-            <UiCardHeader class="flex flex-row items-center justify-between space-y-0 pb-5 relative z-10">
+            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-5 relative z-10">
               <div>
                 <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
                   <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
@@ -562,7 +565,7 @@ onMounted(() => {
             <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
               <Globe class="h-32 w-32 rotate-12" />
             </div>
-            <UiCardHeader class="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-2 relative z-10">
               <div>
                 <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
                   <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
@@ -636,69 +639,14 @@ onMounted(() => {
     </div>
 
     <!-- Dialogs -->
-    <UiDialog v-model:open="isSettingsDialogOpen">
-      <UiDialogContent class="sm:max-w-[520px]">
-        <UiDialogHeader>
-          <UiDialogTitle class="font-black">
-            项目设置
-          </UiDialogTitle>
-          <UiDialogDescription>
-            修改项目展示名称与描述。项目标识用于业务系统接入，创建后不可修改。
-          </UiDialogDescription>
-        </UiDialogHeader>
-        <div class="grid gap-4 py-4">
-          <div class="grid gap-2">
-            <UiLabel for="settings-project-name">
-              项目名称
-            </UiLabel>
-            <UiInput id="settings-project-name" v-model="settingsForm.project_name" placeholder="请输入项目名称" />
-          </div>
-
-          <div class="grid gap-2">
-            <UiLabel for="settings-project-description">
-              项目描述
-            </UiLabel>
-            <UiTextarea id="settings-project-description" v-model="settingsForm.description" class="min-h-[104px]" placeholder="请输入项目描述" />
-          </div>
-
-          <div class="grid gap-2">
-            <UiLabel for="settings-project-url">
-              项目网址
-            </UiLabel>
-            <UiInput id="settings-project-url" v-model="settingsForm.project_url" placeholder="例如：https://nexus.example.com" />
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              左上角项目入口会打开这个地址。可以填写完整 URL，也可以填写域名。
-            </p>
-          </div>
-
-          <div class="grid gap-2">
-            <UiLabel for="settings-project-id">
-              项目标识
-            </UiLabel>
-            <UiInput id="settings-project-id" :model-value="project.project_id_string || '--'" disabled class="font-mono text-xs" />
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              这个标识会被业务系统用于鉴权接入，创建后不可修改；如果填错，需要新建项目。
-            </p>
-          </div>
-        </div>
-        <UiDialogFooter>
-          <UiButton variant="outline" @click="isSettingsDialogOpen = false">
-            取消
-          </UiButton>
-          <UiButton :disabled="savingSettings" @click="handleUpdateProject">
-            <Loader2 v-if="savingSettings" class="mr-2 h-4 w-4 animate-spin" />
-            保存设置
-          </UiButton>
-        </UiDialogFooter>
-      </UiDialogContent>
-    </UiDialog>
+    <ProjectSettingsDialog v-model:name="settingsForm.project_name" v-model:description="settingsForm.description" v-model:url="settingsForm.project_url" :open="isSettingsDialogOpen" :busy="savingSettings" :project-key="project.project_id_string" :error="errors.handleUpdateProject" @close="closeSettings" @save="handleUpdateProject" />
 
     <ConfirmDialog
       v-model:open="isRemoveMemberDialogOpen"
       cancel-button-text="取消"
       confirm-button-text="移出成员"
       destructive
-      :is-loading="removingMember"
+      :error="errors.handleConfirmRemoveMember" :is-loading="removingMember"
       @confirm="handleConfirmRemoveMember"
     >
       <template #title>
@@ -729,6 +677,9 @@ onMounted(() => {
             </UiSelectContent>
           </UiSelect>
         </div>
+        <p v-if="errors.handleUpdateRole" class="text-sm text-destructive" role="alert">
+          {{ errors.handleUpdateRole }}
+        </p>
         <UiDialogFooter>
           <UiButton variant="outline" @click="isEditRoleDialogOpen = false">
             取消
@@ -762,6 +713,9 @@ onMounted(() => {
             <UiTextarea v-model="roleTemplateForm.description" class="min-h-[100px]" />
           </div>
         </div>
+        <p v-if="errors.handleAddRoleTemplate" class="text-sm text-destructive" role="alert">
+          {{ errors.handleAddRoleTemplate }}
+        </p>
         <UiDialogFooter>
           <UiButton variant="outline" @click="isAddRoleTemplateDialogOpen = false">
             取消
@@ -772,7 +726,18 @@ onMounted(() => {
         </UiDialogFooter>
       </UiDialogContent>
     </UiDialog>
-    <SSOClients v-if="!loading" :project-id="projectId" />
+    <SSOClients v-if="!loading && !errors.fetchProjectDetail" :project-id="projectId" />
+    <UiAlertDialog :open="showDiscardDialog" @update:open="value => { if (!value) resolveDiscard(false) }">
+      <UiAlertDialogContent class="z-[100]">
+        <UiAlertDialogHeader><UiAlertDialogTitle>放弃未保存的修改？</UiAlertDialogTitle><UiAlertDialogDescription>切换项目或离开页面将丢弃当前表单。</UiAlertDialogDescription></UiAlertDialogHeader><UiAlertDialogFooter>
+          <UiAlertDialogCancel @click="resolveDiscard(false)">
+            继续编辑
+          </UiAlertDialogCancel><UiButton variant="destructive" @click="resolveDiscard(true)">
+            放弃修改
+          </UiButton>
+        </UiAlertDialogFooter>
+      </UiAlertDialogContent>
+    </UiAlertDialog>
   </BasicPage>
 </template>
 

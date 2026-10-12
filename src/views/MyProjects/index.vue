@@ -14,6 +14,8 @@ import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { reqMyProjects } from '@/api/project'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+import { errorMessage } from '@/lib/errors'
 
 interface MyProjectCard {
   id: string
@@ -27,6 +29,7 @@ interface MyProjectCard {
 
 const searchQuery = ref('')
 const loading = ref(false)
+const loadError = ref('')
 const memberships = ref<MyProjectMembership[]>([])
 
 const roleMap: Record<string, { label: string, class: string, iconClass: string, accent: string }> = {
@@ -68,7 +71,7 @@ const roleMap: Record<string, { label: string, class: string, iconClass: string,
   },
 }
 
-const defaultRoleStyle = roleMap.viewer
+const defaultRoleStyle = { label: '只读', class: 'bg-muted text-muted-foreground', iconClass: 'bg-muted text-muted-foreground', accent: 'from-slate-500 to-slate-400' }
 
 const humanizeSince = (dateString?: string) => {
   if (!dateString)
@@ -119,12 +122,14 @@ const filteredProjects = computed(() => {
 
 const fetchMyProjects = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await reqMyProjects()
     memberships.value = res.data.projects || []
   }
-  catch (error: any) {
-    toast.error(error.message || '加载我的项目失败')
+  catch (error: unknown) {
+    loadError.value = errorMessage(error)
+    toast.error(loadError.value)
   }
   finally {
     loading.value = false
@@ -148,6 +153,7 @@ onMounted(() => {
 
 <template>
   <BasicPage title="我的项目" description="查看当前账号已获授权的项目与角色">
+    <QueryError v-if="loadError" :message="loadError" @retry="fetchMyProjects" />
     <template #actions>
       <UiButton variant="outline" size="sm" :disabled="loading" class="cursor-pointer rounded-full" @click="fetchMyProjects">
         <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />

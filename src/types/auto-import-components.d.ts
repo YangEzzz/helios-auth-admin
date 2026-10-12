@@ -43,6 +43,7 @@ declare module 'vue' {
     HelloWorld: typeof import('./../components/HelloWorld.vue')['default']
     Loading: typeof import('./../components/Loading.vue')['default']
     NoResultFound: typeof import('./../components/no-result-found.vue')['default']
+    QueryError: typeof import('./../components/query-error.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ToggleTheme: typeof import('./../components/toggle-theme.vue')['default']

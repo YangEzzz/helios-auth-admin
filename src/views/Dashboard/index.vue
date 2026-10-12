@@ -24,6 +24,7 @@ import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { reqDashboard } from '@/api/dashboard'
 import { BasicPage } from '@/components/global-layout'
+import { errorMessage } from '@/lib/errors'
 import { useAuthStore } from '@/store/auth'
 
 const authStore = useAuthStore()
@@ -125,8 +126,8 @@ async function fetchDashboard() {
     const res = await reqDashboard()
     dashboard.value = res.data
   }
-  catch (error: any) {
-    toast.error(error.message || '仪表盘加载失败')
+  catch (error: unknown) {
+    toast.error(errorMessage(error) || '仪表盘加载失败')
   }
   finally {
     loading.value = false
@@ -465,7 +466,7 @@ const projectHighlights = computed(() => (userData.value?.projects ?? []).slice(
             </UiCardContent>
           </UiCard>
 
-          <UiCard v-if="roleMode !== 'admin'" class="rounded-2xl border-border/50 shadow-sm">
+          <UiCard class="rounded-2xl border-border/50 shadow-sm">
             <UiCardHeader class="space-y-1 p-4 pb-2">
               <UiCardTitle>全部授权项目</UiCardTitle>
               <UiCardDescription>更完整的项目列表，适合快速扫一遍角色和时间。</UiCardDescription>

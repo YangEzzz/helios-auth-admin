@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
+import { isAdminRole } from '@/lib/accounts'
 import { useAuthStore } from '@/store/auth'
 
 const { teams } = defineProps<{
@@ -30,14 +31,14 @@ const { isMobile, open } = useSidebar()
 const router = useRouter()
 const authStore = useAuthStore()
 
-const activeTeam = computed(() => teams[0])
+const activeTeam = computed(() => teams[0] ?? { name: 'Helios', plan: '项目入口', logoUrl: '/helios-icon.svg', logo: FolderOpen })
 const projects = ref<ProjectInfo[]>([])
 const loading = ref(false)
 const menuOpen = ref(false)
 
 const canReadAllProjects = computed(() => {
   const role = authStore.userInfo?.role
-  return role === 'admin' || role === 'super_admin'
+  return isAdminRole(role)
 })
 
 function normalizeProjectUrl(url?: string) {

@@ -1,14 +1,9 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 import { reqUserInfo } from '@/api/user'
+import { isAdminRole } from '@/lib/accounts'
 import { useAuthStore } from '@/store/auth'
 import { sessionInfo } from '@/utils/session'
-
-const adminRoles = ['admin', 'super_admin']
-
-const isAdminRole = (role?: string) => {
-  return !!role && adminRoles.includes(role)
-}
 
 // 基础路由 - 不需要权限控制的路由
 const baseRoutes: RouteRecordRaw[] = [
@@ -88,17 +83,22 @@ const baseRoutes: RouteRecordRaw[] = [
   },
 
   // ===== 旧版 Auth 路由（保留兼容性）=====
-  {
-    path: '/tasks',
-    component: () => import('@/layouts/index.vue'),
-    children: [
-      {
-        path: '',
-        name: 'tasks',
-        component: () => import('@/views/Tasks/index.vue'),
-      },
-    ],
-  },
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/tasks',
+          component: () => import('@/layouts/index.vue'),
+          children: [
+            {
+              path: '',
+              name: 'tasks',
+              beforeEnter: () => import.meta.env.DEV ? true : '/errors/404',
+              component: () => import('@/views/Tasks/index.vue'),
+            },
+          ],
+        },
+      ]
+    : []),
   {
     path: '/auth',
     children: [
@@ -115,17 +115,17 @@ const baseRoutes: RouteRecordRaw[] = [
       {
         path: 'sign-up',
         name: 'sign-up',
-        component: () => import('@/views/Auth/SignUp.vue'),
+        redirect: '/register',
       },
       {
         path: 'forgot-password',
         name: 'forgot-password',
-        component: () => import('@/views/Auth/ForgotPassword.vue'),
+        redirect: '/login',
       },
       {
         path: 'otp',
         name: 'otp',
-        component: () => import('@/views/Auth/Otp.vue'),
+        redirect: '/login',
       },
     ],
   },

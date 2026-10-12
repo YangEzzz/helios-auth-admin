@@ -18,8 +18,8 @@ defineProps<LayoutHeaderProps>()
       </template>
     </BasicHeader>
 
-    <main class="pt-0 pb-4">
+    <div class="pt-0 pb-4 min-w-0">
       <slot />
-    </main>
+    </div>
   </main>
 </template>

@@ -33,7 +33,9 @@
   background: linear-gradient(180deg, var(--scrollbar-thumb), var(--scrollbar-thumb-hover));
   border: 2px solid var(--scrollbar-track);
   border-radius: var(--scrollbar-radius);
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {

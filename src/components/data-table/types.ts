@@ -18,6 +18,9 @@ export interface DataTableProps<T> {
   loading?: boolean
   columns: ColumnDef<T, any>[]
   data: T[]
-  meta?: any // 支持透传自定义 meta
+  meta?: import('@tanstack/vue-table').TableMeta<T>
+  getRowId?: (row: T, index: number) => string
+  manualSorting?: boolean
+  manualFiltering?: boolean
   serverPagination?: ServerPagination
 }

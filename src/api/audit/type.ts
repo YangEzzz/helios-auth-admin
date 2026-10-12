@@ -1,6 +1,7 @@
 export interface AuditUser {
   id: string
   name?: string
+  avatar?: string
   username?: string
   email?: string
 }

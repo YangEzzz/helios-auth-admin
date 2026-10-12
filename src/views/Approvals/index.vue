@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ApprovalRow } from './components/columns'
+import type { UserInfo } from '@/api/user/type'
 import {
   RefreshCw,
   Search,
@@ -8,39 +9,29 @@ import {
 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { reqApproveUser, reqRejectUser, reqUserList } from '@/api/user'
+import { fetchUserDirectory, reqApproveUser, reqRejectUser } from '@/api/user'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+import { useAdminAccess } from '@/composables/use-admin-access'
+import { useLatestQuery } from '@/composables/use-latest-query'
+import { errorMessage } from '@/lib/errors'
 import { columns } from './components/columns'
 import ApproveTable from './components/data-table.vue'
 
-const loading = ref(false)
-const rawUsers = ref<any[]>([])
+const { canManage } = useAdminAccess()
+const { data: rawUsers, loading, error: loadError, refresh: fetchUsers } = useLatestQuery<UserInfo[]>(fetchUserDirectory, [])
 const searchQuery = ref('')
-
-const fetchUsers = async () => {
-  loading.value = true
-  try {
-    const res = await reqUserList({ page: 1, page_size: 100 })
-    rawUsers.value = res.data.users
-  }
-  catch {
-    toast.error('获取列表失败')
-  }
-  finally {
-    loading.value = false
-  }
-}
 
 const pendingUsers = computed<ApprovalRow[]>(() => {
   return rawUsers.value
-    .filter((u: any) => u.status === 'pending_approval')
-    .map((u: any) => ({
+    .filter(u => u.status === 'pending_approval')
+    .map(u => ({
       id: u.id,
       name: u.name || '未命名',
       email: u.email,
       department: u.department || '未分配',
       reason: u.reason || '无理由说明',
-      status: u.status,
+      status: u.status || 'pending_approval',
       createdAt: u.created_at ? new Date(u.created_at).toLocaleDateString() : '未知',
     }))
 })
@@ -58,26 +49,40 @@ const filteredPendingUsers = computed(() => {
   )
 })
 
+const approving = ref(false)
+const approvalError = ref('')
 const handleApprove = async (id: string) => {
+  if (!canManage() || approving.value)
+    return
+  approving.value = true
+  approvalError.value = ''
   try {
     await reqApproveUser(id)
     toast.success('审批已通过')
     await fetchUsers()
   }
-  catch {
+  catch (cause) {
+    approvalError.value = errorMessage(cause)
     toast.error('操作失败')
   }
+  finally { approving.value = false }
 }
 
 const handleReject = async (id: string) => {
+  if (!canManage() || approving.value)
+    return
+  approving.value = true
+  approvalError.value = ''
   try {
     await reqRejectUser(id)
     toast.info('申请已拒绝')
     await fetchUsers()
   }
-  catch {
+  catch (cause) {
+    approvalError.value = errorMessage(cause)
     toast.error('操作失败')
   }
+  finally { approving.value = false }
 }
 
 onMounted(() => {
@@ -86,7 +91,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <BasicPage title="注册申请审核">
+  <BasicPage title="注册申请审核" description="处理待审批注册申请">
     <template #actions>
       <UiButton variant="outline" size="sm" :disabled="loading" @click="fetchUsers">
         <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
@@ -95,6 +100,7 @@ onMounted(() => {
     </template>
 
     <div class="space-y-6">
+      <QueryError v-if="loadError" :message="loadError" @retry="fetchUsers" />
       <section class="rounded-[28px] border border-border/60 bg-card/70 p-4 shadow-sm sm:p-5">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="inline-flex items-center gap-2 text-sm text-muted-foreground">
@@ -104,11 +110,11 @@ onMounted(() => {
 
           <div class="relative w-full sm:max-w-sm">
             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <UiInput v-model="searchQuery" class="pl-9" placeholder="搜索姓名、邮箱、部门或申请事由..." />
+            <UiInput v-model="searchQuery" aria-label="搜索账户" class="pl-9" placeholder="搜索姓名、邮箱、部门或申请事由..." />
           </div>
         </div>
 
-        <div v-if="!loading && pendingUsers.length === 0" class="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed px-6 text-center">
+        <div v-if="!loading && !loadError && pendingUsers.length === 0" class="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed px-6 text-center">
           <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
             <ShieldAlert class="h-6 w-6" />
           </div>
@@ -125,7 +131,7 @@ onMounted(() => {
           :data="filteredPendingUsers"
           :columns="columns"
           :loading="loading"
-          :on-approve="handleApprove"
+          :busy="approving" :on-approve="handleApprove"
           :on-reject="handleReject"
         />
       </section>

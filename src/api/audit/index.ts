@@ -1,8 +1,8 @@
+import type { AuditLogQueryReq, AuditLogRes } from './type'
 import request from '@/request'
-import type { AuditLogRes, AuditLogQueryReq } from './type'
 
 export function getAuditLogs(params: AuditLogQueryReq) {
-  return request.get<any, AuditLogRes>('/api/v1/audit_logs', {
+  return request.get<unknown, AuditLogRes>('/api/v1/audit_logs', {
     params,
   })
 }

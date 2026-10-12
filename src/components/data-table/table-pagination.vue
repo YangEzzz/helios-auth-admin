@@ -11,7 +11,7 @@ import {
 } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PAGE_SIZES } from '@/constants/pagination'
 
 interface DataTablePaginationProps {
@@ -38,9 +38,9 @@ const currentPageSize = computed(() => {
 
 const totalPages = computed(() => {
   if (isServerPagination.value && props.serverPagination) {
-    return Math.ceil(props.serverPagination.total / props.serverPagination.pageSize)
+    return Math.max(1, Math.ceil(props.serverPagination.total / props.serverPagination.pageSize))
   }
-  return props.table.getPageCount()
+  return Math.max(1, props.table.getPageCount())
 })
 
 const canPreviousPage = computed(() => {
@@ -57,7 +57,7 @@ const canNextPage = computed(() => {
   return props.table.getCanNextPage()
 })
 
-function handlePageSizeChange(value: any) {
+function handlePageSizeChange(value: unknown) {
   if (!value)
     return
   const newPageSize = Number(value)
@@ -112,9 +112,9 @@ function goToLastPage() {
     <div class="flex items-center space-x-6 lg:space-x-8">
       <div class="flex items-center space-x-2">
         <p class="hidden text-sm font-medium line-clamp-1 md:block">
-          Rows per page
+          每页条数
         </p>
-        <Select
+        <UiSelect
           :model-value="`${currentPageSize}`"
           @update:model-value="handlePageSizeChange"
         >
@@ -126,10 +126,10 @@ function goToLastPage() {
               {{ pageSize }}
             </SelectItem>
           </SelectContent>
-        </Select>
+        </UiSelect>
       </div>
       <div class="flex w-[100px] items-center justify-center text-sm font-medium">
-        Page {{ currentPage }} of {{ totalPages }}
+        第 {{ currentPage }} / {{ totalPages }} 页
       </div>
       <div class="flex items-center space-x-2">
         <Button
@@ -138,7 +138,7 @@ function goToLastPage() {
           :disabled="!canPreviousPage"
           @click="goToFirstPage"
         >
-          <span class="sr-only">Go to first page</span>
+          <span class="sr-only">第一页</span>
           <ChevronsLeft class="size-4" />
         </Button>
         <Button
@@ -147,7 +147,7 @@ function goToLastPage() {
           :disabled="!canPreviousPage"
           @click="goToPreviousPage"
         >
-          <span class="sr-only">Go to previous page</span>
+          <span class="sr-only">上一页</span>
           <ChevronLeftIcon class="size-4" />
         </Button>
         <Button
@@ -156,7 +156,7 @@ function goToLastPage() {
           :disabled="!canNextPage"
           @click="goToNextPage"
         >
-          <span class="sr-only">Go to next page</span>
+          <span class="sr-only">下一页</span>
           <ChevronRightIcon class="size-4" />
         </Button>
         <Button
@@ -165,7 +165,7 @@ function goToLastPage() {
           :disabled="!canNextPage"
           @click="goToLastPage"
         >
-          <span class="sr-only">Go to last page</span>
+          <span class="sr-only">最后一页</span>
           <ChevronsRight class="size-4" />
         </Button>
       </div>

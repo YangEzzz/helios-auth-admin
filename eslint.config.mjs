@@ -23,7 +23,7 @@ export default antfu({
     // 强制使用箭头函数
     'prefer-arrow-callback': ['warn', { allowNamedFunctions: false }],
     // 禁止使用 function 声明,只允许箭头函数
-    'func-style': ['warn', 'expression', { allowArrowFunctions: true }],
+    'func-style': ['error', 'declaration', { allowArrowFunctions: true }],
     // console 使用警告而不是错误
     'no-console': 'warn',
     // 未使用的变量警告而不是错误

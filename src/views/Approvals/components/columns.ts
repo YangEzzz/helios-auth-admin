@@ -56,11 +56,12 @@ export const columns: ColumnDef<ApprovalRow>[] = [
     header: () => h('div', { class: 'text-right' }, '操作'),
     cell: ({ row, table }) => {
       const u = row.original
-      const meta = table.options.meta as any
+      const meta = table.options.meta as { busy?: boolean, canManage: () => boolean, onApprove: (id: string) => void, onReject: (id: string) => void } | undefined
 
       return h('div', { class: 'flex justify-end gap-2' }, [
         h(Button, {
           variant: 'outline',
+          disabled: !meta?.canManage() || meta.busy,
           size: 'sm',
           class: 'text-green-600 hover:text-green-700 hover:bg-green-50 h-8 font-bold border-green-100',
           onClick: () => meta?.onApprove(u.id),
@@ -70,6 +71,7 @@ export const columns: ColumnDef<ApprovalRow>[] = [
         ])),
         h(Button, {
           variant: 'outline',
+          disabled: !meta?.canManage() || meta.busy,
           size: 'sm',
           class: 'text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold border-red-100',
           onClick: () => meta?.onReject(u.id),

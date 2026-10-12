@@ -1,5 +1,8 @@
+import type { UserInfo } from '@/api/user/type'
+
+interface SessionInfo { user: UserInfo | null, csrf_token: string }
 let csrfToken = ''
-let bootstrap: Promise<any> | null = null
+let bootstrap: Promise<SessionInfo> | null = null
 export const apiBaseURL = (import.meta.env.VITE_APP_API_BASE_URL || (import.meta.env.PROD ? 'https://helios-api.team-tool.top' : '')).replace(/\/$/, '')
 
 export function clearLegacyAuth() {
@@ -20,10 +23,10 @@ export async function ssoRequest<T>(path: string, data?: unknown): Promise<T> {
   return result.data as T
 }
 
-export function sessionInfo(): Promise<any> {
+export function sessionInfo(): Promise<SessionInfo> {
   if (!bootstrap) {
     clearLegacyAuth()
-    bootstrap = ssoRequest<any>('/session')
+    bootstrap = ssoRequest<SessionInfo>('/session')
       .then((data) => {
         csrfToken = data.csrf_token
         return data

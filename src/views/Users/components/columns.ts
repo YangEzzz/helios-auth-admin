@@ -4,6 +4,7 @@ import { h } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { accountStatusAction, roleLabels, statusLabels } from '@/lib/accounts'
 
 export interface UserRow {
   id: string
@@ -42,7 +43,7 @@ export const columns: ColumnDef<UserRow>[] = [
     header: '角色',
     cell: ({ row }) => {
       const role = row.getValue('role') as string
-      const label = role === 'admin' ? '管理员' : '成员'
+      const label = roleLabels[role] || `未知角色 (${role})`
       return h(Badge, {
         variant: role === 'admin' ? 'default' : 'secondary',
         class: 'font-medium text-xs px-2 py-0.5',
@@ -57,7 +58,7 @@ export const columns: ColumnDef<UserRow>[] = [
       const isActive = status === 'active'
       return h('div', { class: 'flex items-center gap-1.5' }, [
         h('div', { class: `h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]' : 'bg-destructive'}` }),
-        h('span', { class: `text-xs font-medium ${isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}` }, isActive ? '正常' : '锁定'),
+        h('span', { class: `text-xs font-medium ${isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}` }, statusLabels[status] || `未知状态 (${status})`),
       ])
     },
   },
@@ -71,29 +72,32 @@ export const columns: ColumnDef<UserRow>[] = [
     header: '操作',
     cell: ({ row, table }) => {
       const u = row.original
-      const meta = table.options.meta as any
+      const meta = table.options.meta as { currentUserId?: string, busy?: boolean, canManage: () => boolean, onEditRole: (user: UserRow) => void, onDelete: (user: UserRow) => void } | undefined
       const isMe = u.id === meta?.currentUserId
-      const isLocked = u.status !== 'active'
+      const isLocked = u.status === 'locked'
       const StatusIcon = isLocked ? UnlockKeyhole : LockKeyhole
       const statusTooltip = isLocked ? '解锁用户' : '锁定用户'
 
       return h('div', { class: 'flex items-center gap-1' }, [
         h(Tooltip, {}, () => [
           h(TooltipTrigger, { asChild: true }, () => h(Button, {
-            variant: 'ghost',
-            size: 'icon',
-            class: 'h-8 w-8 rounded-lg text-muted-foreground hover:text-primary transition-colors',
-            onClick: () => meta?.onEditRole(u),
+            'variant': 'ghost',
+            'size': 'icon',
+            'aria-label': `修改 ${u.name} 的角色`,
+            'disabled': !meta?.canManage() || meta.busy,
+            'class': 'h-8 w-8 rounded-lg text-muted-foreground hover:text-primary transition-colors',
+            'onClick': () => meta?.onEditRole(u),
           }, () => h(Shield, { class: 'h-3.5 w-3.5' }))),
           h(TooltipContent, {}, () => h('p', '修改角色')),
         ]),
         h(Tooltip, {}, () => [
           h(TooltipTrigger, { asChild: true }, () => h(Button, {
-            variant: 'ghost',
-            size: 'icon',
-            disabled: isMe,
-            class: `h-8 w-8 rounded-lg text-muted-foreground transition-colors disabled:opacity-30 ${isLocked ? 'hover:text-emerald-600' : 'hover:text-destructive'}`,
-            onClick: () => meta?.onDelete(u),
+            'variant': 'ghost',
+            'size': 'icon',
+            'disabled': isMe || !meta?.canManage() || meta.busy || !accountStatusAction(u.status),
+            'aria-label': `${statusTooltip} ${u.name}`,
+            'class': `h-8 w-8 rounded-lg text-muted-foreground transition-colors disabled:opacity-30 ${isLocked ? 'hover:text-emerald-600' : 'hover:text-destructive'}`,
+            'onClick': () => meta?.onDelete(u),
           }, () => h(StatusIcon, { class: 'h-3.5 w-3.5' }))),
           h(TooltipContent, {}, () => h('p', isMe ? '不能操作当前账号' : statusTooltip)),
         ]),

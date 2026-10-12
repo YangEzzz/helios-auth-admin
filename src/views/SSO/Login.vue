@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { SSORequestInfo } from '@/api/sso/auth'
 import { Eye, EyeOff, ShieldCheck } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ssoRequest } from '@/utils/session'
+import { cancelSSORequest, continueSSOLogin, getSSORequest, loginSSORequest, logoutSSOSession } from '@/api/sso/auth'
 
-interface RequestInfo { app_name: string, csrf_token: string, user: { name: string, email: string } | null }
+type RequestInfo = SSORequestInfo
 const route = useRoute()
 const requestID = typeof route.query.request === 'string' ? route.query.request : ''
 const info = ref<RequestInfo | null>(null)
@@ -22,14 +23,14 @@ async function load() {
   try {
     if (!requestID)
       throw new Error('登录请求已失效，请返回应用重新登录')
-    info.value = await ssoRequest<RequestInfo>(`/request?id=${encodeURIComponent(requestID)}`)
+    info.value = await getSSORequest(requestID)
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : '无法加载登录请求，请重试' }
   finally { loading.value = false }
 }
 
 async function continueLogin() {
-  const result = await ssoRequest<{ redirect_url: string }>('/continue', { request_id: requestID })
+  const result = await continueSSOLogin(requestID)
   window.location.assign(result.redirect_url)
 }
 
@@ -45,7 +46,7 @@ async function submit() {
   busy.value = true
   try {
     if (!info.value?.user) {
-      const result = await ssoRequest<{ user: RequestInfo['user'] }>('/login', { request_id: requestID, email: email.value, password: password.value })
+      const result = await loginSSORequest({ request_id: requestID, email: email.value, password: password.value })
       password.value = ''
       if (info.value)
         info.value.user = result.user
@@ -62,7 +63,7 @@ async function switchAccount() {
   busy.value = true
   error.value = ''
   try {
-    await ssoRequest('/logout', {})
+    await logoutSSOSession()
     if (info.value)
       info.value.user = null
   }
@@ -75,7 +76,7 @@ async function cancel() {
     return
   busy.value = true
   try {
-    const result = await ssoRequest<{ redirect_url: string }>('/cancel', { request_id: requestID })
+    const result = await cancelSSORequest(requestID)
     window.location.assign(result.redirect_url)
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : '无法取消，请关闭窗口返回应用' }

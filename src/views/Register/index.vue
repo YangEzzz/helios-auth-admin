@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { reqRegister, reqUploadAvatar } from '@/api/user'
+import { errorMessage } from '@/lib/errors'
 
 const router = useRouter()
 const form = ref({
@@ -46,8 +47,8 @@ async function handleFileChange(event: Event) {
     form.value.avatar = newAvatarUrl
     toast.success('头像上传成功')
   }
-  catch (e: any) {
-    toast.error(e.message || '头像上传失败')
+  catch (e: unknown) {
+    toast.error(errorMessage(e) || '头像上传失败')
   }
   finally {
     uploading.value = false
@@ -73,8 +74,8 @@ async function handleRegister() {
     submitted.value = true
     toast.success('申请提交成功')
   }
-  catch (e: any) {
-    toast.error(e.message || '申请提交失败')
+  catch (e: unknown) {
+    toast.error(errorMessage(e) || '申请提交失败')
   }
   finally {
     loading.value = false

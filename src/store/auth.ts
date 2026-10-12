@@ -1,7 +1,8 @@
 import type { UserInfo } from '@/api/user/type'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { clearLegacyAuth, ssoRequest } from '@/utils/session'
+import { logoutSSOSession } from '@/api/sso/auth'
+import { clearLegacyAuth } from '@/utils/session'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
@@ -24,7 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
     userInfo.value = null
   }
   const logout = async () => {
-    await ssoRequest('/logout', {})
+    await logoutSSOSession()
     clearSession()
   }
 

@@ -11,44 +11,32 @@ import {
 import { computed, ref, watch } from 'vue'
 import { getAuditLogs } from '@/api/audit'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+import { useLatestQuery } from '@/composables/use-latest-query'
+import { csvCell } from '@/lib/csv'
 
-const logs = ref<AuditLog[]>([])
-const loading = ref(false)
-const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const resourceFilter = ref('')
 
 const pageSizeOptions = ['10', '20', '50']
 
+const { data: result, loading, error: loadError, refresh: fetchLogs } = useLatestQuery(async () => (await getAuditLogs({ page: page.value, page_size: pageSize.value, resource: resourceFilter.value.trim() || undefined })).data, { logs: [] as AuditLog[], total: 0, page: 1, page_size: 10, total_pages: 1 })
+const logs = computed(() => result.value.logs)
+const total = computed(() => result.value.total)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const hasFilter = computed(() => resourceFilter.value.trim().length > 0)
 const pageStart = computed(() => total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1)
 const pageEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 
-const fetchLogs = async () => {
-  loading.value = true
-  try {
-    const res = await getAuditLogs({
-      page: page.value,
-      page_size: pageSize.value,
-      resource: resourceFilter.value.trim() || undefined,
-    })
-
-    if (res.code === 200) {
-      logs.value = res.data.logs
-      total.value = res.data.total
-    }
-  }
-  catch (error) {
-    console.error('Failed to fetch audit logs', error)
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-watch([page, pageSize], fetchLogs, { immediate: true })
+watch(page, fetchLogs)
+watch(pageSize, () => {
+  if (page.value === 1)
+    fetchLogs()
+  else
+    page.value = 1
+})
+fetchLogs()
 
 function applyFilter() {
   if (page.value !== 1) {
@@ -146,7 +134,7 @@ function handleExport() {
     headers.join(','),
     ...rows.map(row =>
       headers
-        .map(header => `"${String(row[header as keyof typeof row]).replace(/"/g, '""')}"`)
+        .map(header => csvCell(row[header as keyof typeof row]))
         .join(','),
     ),
   ].join('\n')
@@ -165,6 +153,7 @@ function handleExport() {
 
 <template>
   <BasicPage title="操作日志" description="查看系统所有操作的审计记录">
+    <QueryError v-if="loadError" :message="loadError" @retry="fetchLogs" />
     <template #actions>
       <div class="flex gap-2">
         <UiButton variant="outline" size="sm" :disabled="loading" @click="handleRefresh">

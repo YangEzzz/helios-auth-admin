@@ -15,14 +15,16 @@ interface ConfirmDialogProps {
   cancelButtonText?: string
   confirmButtonText?: string
   destructive?: boolean
+  error?: string
 }
 
 const {
   isLoading = false,
   disabled = false,
   destructive = false,
-  cancelButtonText = 'Cancel',
-  confirmButtonText = 'Continue',
+  error = '',
+  cancelButtonText = '取消',
+  confirmButtonText = '确认',
 } = defineProps<ConfirmDialogProps>()
 
 const emits = defineEmits<{
@@ -34,13 +36,13 @@ const openModel = defineModel<boolean>('open', {
 })
 
 function handleConfirm() {
-  emits('confirm')
-  openModel.value = false
+  if (!isLoading && !disabled)
+    emits('confirm')
 }
 </script>
 
 <template>
-  <AlertDialog :open="openModel">
+  <AlertDialog :open="openModel" @update:open="value => { if (!isLoading) openModel = value }">
     <AlertDialogContent>
       <AlertDialogHeader class="text-start">
         <AlertDialogTitle>
@@ -52,6 +54,9 @@ function handleConfirm() {
       </AlertDialogHeader>
 
       <slot />
+      <p v-if="error" class="text-sm text-destructive" role="alert">
+        {{ error }}
+      </p>
 
       <AlertDialogFooter>
         <AlertDialogCancel :disabled="isLoading" @click="openModel = false">

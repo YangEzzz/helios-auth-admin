@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProjectInfo } from '@/api/project/type'
 import { Activity, ArrowRight, FolderOpen, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -6,27 +7,17 @@ import { toast } from 'vue-sonner'
 import { reqCreateProject, reqDeleteProject, reqListProjects } from '@/api/project'
 import ConfirmDialog from '@/components/confirm-dialog.vue'
 import { BasicPage } from '@/components/global-layout'
+import QueryError from '@/components/query-error.vue'
+import { useAdminAccess } from '@/composables/use-admin-access'
+import { useLatestQuery } from '@/composables/use-latest-query'
+import { errorMessage } from '@/lib/errors'
 
 const router = useRouter()
 const searchQuery = ref('')
-const loading = ref(false)
-const rawProjects = ref<any[]>([])
+const { canManage } = useAdminAccess()
+const { data: rawProjects, loading, error: loadError, refresh: fetchProjects } = useLatestQuery<ProjectInfo[]>(async () => (await reqListProjects()).data.projects, [])
 
 // 1. 获取项目列表
-async function fetchProjects() {
-  loading.value = true
-  try {
-    const res = await reqListProjects()
-    rawProjects.value = res.data.projects
-  }
-  catch {
-    toast.error('加载项目失败')
-  }
-  finally {
-    loading.value = false
-  }
-}
-
 // 2. 数据转换映射
 const projects = computed(() => {
   return (rawProjects.value || []).map(p => ({
@@ -52,6 +43,7 @@ const filtered = computed(() => {
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteProjectId = ref('')
 const deleting = ref(false)
+const deleteError = ref('')
 
 function deleteProject(id: string) {
   pendingDeleteProjectId.value = id
@@ -59,6 +51,9 @@ function deleteProject(id: string) {
 }
 
 async function handleConfirmDeleteProject() {
+  if (!canManage() || deleting.value)
+    return
+  deleteError.value = ''
   if (!pendingDeleteProjectId.value)
     return
 
@@ -66,10 +61,12 @@ async function handleConfirmDeleteProject() {
   try {
     await reqDeleteProject({ id: pendingDeleteProjectId.value })
     toast.success('项目已删除')
+    isDeleteDialogOpen.value = false
     pendingDeleteProjectId.value = ''
     await fetchProjects()
   }
-  catch {
+  catch (cause) {
+    deleteError.value = errorMessage(cause)
     toast.error('删除失败')
   }
   finally {
@@ -86,13 +83,17 @@ const createForm = reactive({
   description: '',
 })
 const creating = ref(false)
+const createError = ref('')
 
 async function handleCreateProject() {
+  if (!canManage() || creating.value)
+    return
   if (!createForm.project_name || !createForm.project_id_string) {
     toast.error('请填写必填项')
     return
   }
 
+  createError.value = ''
   creating.value = true
   try {
     await reqCreateProject({ ...createForm })
@@ -105,8 +106,9 @@ async function handleCreateProject() {
     createForm.description = ''
     await fetchProjects()
   }
-  catch (e: any) {
-    toast.error(e.message || '创建失败')
+  catch (e: unknown) {
+    createError.value = errorMessage(e)
+    toast.error(createError.value)
   }
   finally {
     creating.value = false
@@ -120,6 +122,7 @@ onMounted(() => {
 
 <template>
   <BasicPage title="项目管理" description="管理系统接入项目，配置鉴权标识与角色模板">
+    <QueryError v-if="loadError" :message="loadError" @retry="fetchProjects" />
     <template #actions>
       <!-- 新增项目弹窗 -->
       <UiDialog v-model:open="isCreateDialogOpen">
@@ -168,6 +171,9 @@ onMounted(() => {
               <UiTextarea id="description" v-model="createForm.description" placeholder="请输入项目简要描述..." rows="3" />
             </div>
           </div>
+          <p v-if="createError" class="text-sm text-destructive" role="alert">
+            {{ createError }}
+          </p>
           <UiDialogFooter>
             <UiButton variant="outline" @click="isCreateDialogOpen = false">
               取消
@@ -200,7 +206,7 @@ onMounted(() => {
         <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
           <div class="relative flex-1 lg:w-80">
             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <UiInput v-model="searchQuery" placeholder="搜索项目名称、标识或描述" class="h-10 rounded-xl pl-9" />
+            <UiInput v-model="searchQuery" aria-label="搜索项目" placeholder="搜索项目名称、标识或描述" class="h-10 rounded-xl pl-9" />
           </div>
           <UiButton variant="outline" size="icon" :disabled="loading" class="h-10 w-10 rounded-xl" @click="fetchProjects">
             <Activity class="h-4 w-4" :class="[loading ? 'animate-spin' : '']" />
@@ -295,7 +301,7 @@ onMounted(() => {
       cancel-button-text="取消"
       confirm-button-text="删除项目"
       destructive
-      :is-loading="deleting"
+      :error="deleteError" :is-loading="deleting"
       @confirm="handleConfirmDeleteProject"
     >
       <template #title>
