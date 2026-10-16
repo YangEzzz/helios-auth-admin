@@ -24,11 +24,11 @@ export const columns: ColumnDef<UserRow>[] = [
       const u = row.original
       return h('div', { class: 'flex items-center gap-3 py-1' }, [
         h('div', {
-          class: 'h-9 w-9 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary font-bold text-xs shadow-sm',
+          class: 'h-9 w-9 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary font-medium text-xs ',
         }, u.name.substring(0, 1).toUpperCase()),
         h('div', { class: 'flex flex-col min-w-0' }, [
           h('span', { class: 'font-semibold text-sm truncate max-w-[180px]' }, u.name),
-          h('span', { class: 'text-xs text-muted-foreground truncate max-w-[220px]' }, u.email),
+          h('span', { class: 'text-xs text-muted-foreground break-all max-w-[220px]' }, u.email),
         ]),
       ])
     },
@@ -57,8 +57,8 @@ export const columns: ColumnDef<UserRow>[] = [
       const status = row.getValue('status') as string
       const isActive = status === 'active'
       return h('div', { class: 'flex items-center gap-1.5' }, [
-        h('div', { class: `h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]' : 'bg-destructive'}` }),
-        h('span', { class: `text-xs font-medium ${isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}` }, statusLabels[status] || `未知状态 (${status})`),
+        h('div', { class: `h-1.5 w-1.5 rounded-full ${isActive ? 'bg-foreground' : 'bg-destructive'}` }),
+        h('span', { class: `text-xs font-medium ${isActive ? 'text-foreground' : 'text-destructive'}` }, statusLabels[status] || `未知状态 (${status})`),
       ])
     },
   },
@@ -96,7 +96,7 @@ export const columns: ColumnDef<UserRow>[] = [
             'size': 'icon',
             'disabled': isMe || !meta?.canManage() || meta.busy || !accountStatusAction(u.status),
             'aria-label': `${statusTooltip} ${u.name}`,
-            'class': `h-8 w-8 rounded-lg text-muted-foreground transition-colors disabled:opacity-30 ${isLocked ? 'hover:text-emerald-600' : 'hover:text-destructive'}`,
+            'class': `h-8 w-8 rounded-lg text-muted-foreground transition-colors disabled:opacity-30 ${isLocked ? 'hover:text-foreground' : 'hover:text-destructive'}`,
             'onClick': () => meta?.onDelete(u),
           }, () => h(StatusIcon, { class: 'h-3.5 w-3.5' }))),
           h(TooltipContent, {}, () => h('p', isMe ? '不能操作当前账号' : statusTooltip)),

@@ -3,7 +3,6 @@ import type { UserInfo } from '@/api/user/type'
 import {
   Building2,
   Camera,
-  CheckCircle2,
   Clock,
   Fingerprint,
   Loader2,
@@ -14,6 +13,7 @@ import {
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { reqSaveAvatar, reqUploadAvatar, reqUserInfo } from '@/api/user'
+import { BasicPage } from '@/components/global-layout'
 import QueryError from '@/components/query-error.vue'
 import { roleLabels as roleMap, statusLabels } from '@/lib/accounts'
 import { errorMessage } from '@/lib/errors'
@@ -95,216 +95,78 @@ async function handleFileChange(event: Event) {
     input.value = '' // 清除 input
   }
 }
-
-const statusMap: Record<string, { label: string, color: string }> = {
-  active: { label: '正常激活', color: 'bg-green-500' },
-  pending_approval: { label: '等待审批', color: 'bg-yellow-500' },
-  rejected: { label: '未通过', color: 'bg-red-500' },
-  locked: { label: '已锁定', color: 'bg-gray-500' },
-}
 </script>
 
 <template>
-  <QueryError v-if="loadError" :message="loadError" @retry="fetchUserInfo" />
-  <div class="p-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-    <!-- Header -->
-    <div class="mb-8 flex items-end justify-between">
-      <div>
-        <h1 class="text-3xl font-black tracking-tight flex items-center gap-3">
-          个人资料
-          <span class="text-xs font-black uppercase tracking-widest bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">Profile</span>
-        </h1>
-        <p class="text-muted-foreground mt-1 text-sm">
-          管理您的个人身份信息与账户设置。
-        </p>
-      </div>
+  <BasicPage title="个人资料" description="查看账户身份、团队信息与全局访问角色">
+    <QueryError v-if="loadError" :message="loadError" class="mb-5" @retry="fetchUserInfo" />
+    <div v-if="loading" class="workspace-panel flex min-h-80 items-center justify-center" role="status">
+      <Loader2 class="size-6 animate-spin text-primary" />
     </div>
-
-    <div v-if="loading" class="py-20 flex justify-center">
-      <Loader2 class="h-10 w-10 animate-spin text-primary/30" />
-    </div>
-
-    <div v-else-if="userInfo" class="grid gap-8 md:grid-cols-12">
-      <!-- Left: Avatar Card -->
-      <div class="md:col-span-4 space-y-6">
-        <UiCard class="border-border/40 shadow-sm overflow-hidden bg-muted/5">
-          <UiCardContent class="p-8 flex flex-col items-center">
-            <div class="relative group">
-              <input
-                ref="fileInput"
-                type="file"
-                class="hidden"
-                accept="image/*"
-                @change="handleFileChange"
-              >
-              <div
-                class="h-32 w-32 rounded-full border-4 border-background shadow-xl overflow-hidden cursor-pointer relative transition-transform hover:scale-105 active:scale-95"
-                @click="triggerUpload"
-              >
-                <img
-                  v-if="userInfo.avatar"
-                  :src="userInfo.avatar"
-                  class="h-full w-full object-cover"
-                >
-                <div v-else class="h-full w-full bg-primary/10 flex items-center justify-center text-primary font-black text-3xl">
-                  {{ userInfo.name?.substring(0, 1).toUpperCase() }}
-                </div>
-
-                <!-- Overlay on hover -->
-                <div class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera class="h-6 w-6 text-white mb-1" />
-                  <span class="text-[8px] text-white font-black uppercase tracking-widest">更换头像</span>
-                </div>
-
-                <!-- Loading Spinner Overlay -->
-                <div v-if="uploading" class="absolute inset-0 bg-background/80 flex items-center justify-center">
-                  <Loader2 class="h-8 w-8 animate-spin text-primary" />
-                </div>
-              </div>
-            </div>
-
-            <h2 class="mt-6 text-xl font-black tracking-tight">
-              {{ userInfo.name }}
-            </h2>
-            <div class="flex items-center gap-2 mt-2">
-              <div class="h-2 w-2 rounded-full" :class="[statusMap[userInfo.status || 'unknown']?.color || 'bg-gray-400']" />
-              <span class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{{ statusLabels[userInfo.status || 'unknown'] || userInfo.status }}</span>
-            </div>
-          </UiCardContent>
-        </UiCard>
-
-        <!-- Role Info -->
-        <UiCard class="border-border/40 shadow-sm border-l-4 border-l-primary/40 bg-primary/5">
-          <UiCardContent class="p-6">
-            <div class="flex items-center gap-3 mb-2">
-              <Shield class="h-4 w-4 text-primary" />
-              <span class="text-xs font-black uppercase tracking-widest">系统授信角色</span>
-            </div>
-            <p class="text-lg font-black">
-              {{ roleMap[userInfo.role] || userInfo.role }}
-            </p>
-            <p class="text-[10px] text-muted-foreground mt-1 tracking-tighter italic">
-              该角色决定了您在系统内的全局操作权限。
-            </p>
-          </UiCardContent>
-        </UiCard>
-      </div>
-
-      <!-- Right: Detailed Info -->
-      <div class="md:col-span-8 space-y-6">
-        <UiCard class="border-border/40 shadow-sm overflow-hidden">
-          <UiCardHeader class="border-b border-border/40 bg-muted/10">
-            <UiCardTitle class="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-              <User class="h-4 w-4 opacity-40" />
-              基础账户信息
-            </UiCardTitle>
-          </UiCardHeader>
-          <UiCardContent class="p-0">
-            <div class="divide-y divide-border/40">
-              <!-- ID -->
-              <div class="p-6 flex items-center justify-between group hover:bg-muted/5 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="h-10 w-10 rounded-lg bg-muted/40 flex items-center justify-center">
-                    <Fingerprint class="h-5 w-5 text-muted-foreground/50" />
-                  </div>
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
-                      账户唯一标识 (UID)
-                    </p>
-                    <p class="text-xs font-mono mt-1 select-all">
-                      {{ userInfo.id }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Name -->
-              <div class="p-6 flex items-center justify-between group hover:bg-muted/5 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="h-10 w-10 rounded-lg bg-muted/40 flex items-center justify-center">
-                    <User class="h-5 w-5 text-muted-foreground/50" />
-                  </div>
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
-                      显示姓名
-                    </p>
-                    <p class="text-sm font-bold mt-1">
-                      {{ userInfo.name }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Email -->
-              <div class="p-6 flex items-center justify-between group hover:bg-muted/5 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="h-10 w-10 rounded-lg bg-muted/40 flex items-center justify-center">
-                    <Mail class="h-5 w-5 text-muted-foreground/50" />
-                  </div>
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
-                      电子邮箱
-                    </p>
-                    <p class="text-sm font-bold mt-1 text-primary">
-                      {{ userInfo.email }}
-                    </p>
-                  </div>
-                </div>
-                <CheckCircle2 class="h-4 w-4 text-green-500 opacity-60" />
-              </div>
-
-              <!-- Department -->
-              <div class="p-6 flex items-center justify-between group hover:bg-muted/5 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="h-10 w-10 rounded-lg bg-muted/40 flex items-center justify-center">
-                    <Building2 class="h-5 w-5 text-muted-foreground/50" />
-                  </div>
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
-                      所属部门/团队
-                    </p>
-                    <p class="text-sm font-bold mt-1">
-                      {{ userInfo.department || '未录入' }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Created At -->
-              <div class="p-6 flex items-center justify-between group hover:bg-muted/5 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="h-10 w-10 rounded-lg bg-muted/40 flex items-center justify-center">
-                    <Clock class="h-5 w-5 text-muted-foreground/50" />
-                  </div>
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
-                      注册时间
-                    </p>
-                    <p class="text-sm font-bold mt-1">
-                      {{ new Date(userInfo.created_at || '').toLocaleString() }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </UiCardContent>
-        </UiCard>
-
-        <!-- Security Notice -->
-        <div class="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 flex items-start gap-4">
-          <div class="h-8 w-8 rounded-full bg-yellow-500/10 flex items-center justify-center shrink-0">
-            <Shield class="h-4 w-4 text-yellow-500" />
-          </div>
-          <div>
-            <p class="text-xs font-black text-yellow-700 dark:text-yellow-400 uppercase tracking-widest">
-              安全警示
-            </p>
-            <p class="text-xs text-muted-foreground mt-1 leading-relaxed">
-              您的账户在项目中的最高权限由系统管理员分配。如需变更姓名或邮箱等敏感真实信息，请提交工单至 OA 系统申诉，在此处仅支持更新头像预览。
-            </p>
-          </div>
+    <div v-else-if="userInfo" class="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section class="workspace-panel overflow-hidden">
+        <div class="profile-cover flex h-28 items-end justify-center">
+          <Shield class="mb-5 size-10 text-[var(--brand-caption)]" />
         </div>
-      </div>
+        <div class="p-6 text-center">
+          <input ref="fileInput" type="file" class="hidden" accept="image/*" aria-label="选择新头像" @change="handleFileChange">
+          <button type="button" :disabled="uploading" aria-label="更换头像" class="relative mx-auto -mt-16 flex size-24 items-center justify-center overflow-hidden rounded-2xl border-4 border-card bg-muted font-display text-3xl font-semibold text-primary hover:bg-accent" @click="triggerUpload">
+            <Loader2 v-if="uploading" class="size-6 animate-spin" /><img v-else-if="userInfo.avatar" :src="userInfo.avatar" alt="当前账户头像" class="h-full w-full object-cover"><span v-else>{{ userInfo.name?.slice(0, 1) }}</span>
+          </button>
+          <h2 class="mt-5 text-xl font-semibold">
+            {{ userInfo.name }}
+          </h2><p class="mt-2 break-all text-xs text-muted-foreground">
+            {{ userInfo.email }}
+          </p><span class="mt-4 inline-block rounded-md bg-primary/10 px-3 py-1 text-xs text-primary">{{ statusLabels[userInfo.status || ''] || userInfo.status }}</span>
+          <UiButton variant="outline" class="mt-6 w-full" :disabled="uploading" @click="triggerUpload">
+            <Camera class="size-4" />更换头像
+          </UiButton>
+        </div>
+        <div class="border-t bg-muted/30 p-5">
+          <p class="flex items-center gap-2 text-xs text-muted-foreground">
+            <Shield class="size-4 text-primary" />全局角色
+          </p><p class="mt-2 text-sm font-semibold">
+            {{ roleMap[userInfo.role] || userInfo.role }}
+          </p><p class="mt-2 text-xs leading-6 text-muted-foreground">
+            项目角色由对应项目单独分配。
+          </p>
+        </div>
+      </section>
+      <section class="workspace-panel overflow-hidden">
+        <header class="panel-heading">
+          <div><h2>账户信息</h2><p>用于识别你的团队身份</p></div><User class="size-5 text-muted-foreground" />
+        </header>
+        <dl class="divide-y divide-border px-6">
+          <div
+            v-for="item in [
+              { label: '显示姓名', value: userInfo.name, icon: User },
+              { label: '电子邮箱', value: userInfo.email, icon: Mail },
+              { label: '所属部门', value: userInfo.department || '未填写', icon: Building2 },
+              { label: '账户标识', value: userInfo.id, icon: Fingerprint },
+              { label: '注册时间', value: userInfo.created_at ? new Date(userInfo.created_at).toLocaleString('zh-CN') : '未知', icon: Clock },
+            ]" :key="item.label" class="flex items-start gap-4 py-5"
+          >
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <component :is="item.icon" class="size-4" />
+            </div><div class="min-w-0">
+              <dt class="text-xs text-muted-foreground">
+                {{ item.label }}
+              </dt><dd class="mt-2 break-all text-sm font-medium">
+                {{ item.value }}
+              </dd>
+            </div>
+          </div>
+        </dl>
+        <footer class="border-t bg-muted/30 px-6 py-4 text-xs leading-6 text-muted-foreground">
+          这里支持更新头像。如需变更账户信息或访问权限，请联系管理员。
+        </footer>
+      </section>
     </div>
-  </div>
+  </BasicPage>
 </template>
+
+<style scoped>
+.profile-cover {
+  background: var(--brand-ink);
+}
+</style>

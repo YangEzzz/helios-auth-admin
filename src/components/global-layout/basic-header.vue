@@ -9,18 +9,18 @@ defineProps<LayoutHeaderProps>()
 <template>
   <header
     :class="cn(
-      'flex flex-col md:flex-row gap-2 justify-between py-2',
-      sticky ? 'sticky top-0 z-40 bg-background' : '',
+      'flex flex-col gap-4 pb-6 sm:flex-row sm:items-center sm:justify-between',
+      sticky ? 'sticky top-16 z-30 bg-background pt-4' : '',
     )"
   >
-    <main>
-      <h1 class="text-2xl font-bold">
+    <div class="min-w-0 space-y-2">
+      <h1 class="font-display text-2xl font-semibold tracking-tight sm:text-[28px]">
         {{ title }}
       </h1>
-      <p v-if="description" class="text-muted-foreground">
+      <p v-if="description" class="text-sm leading-6 text-muted-foreground">
         {{ description }}
       </p>
-    </main>
+    </div>
 
     <aside class="flex items-center gap-2 flex-wrap">
       <slot name="actions" />

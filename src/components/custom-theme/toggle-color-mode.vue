@@ -23,8 +23,8 @@ function setColorMode(colorMode: BasicColorSchema) {
 
 <template>
   <div class="space-y-1.5 pt-6">
-    <UiLabel for="radius" class="text-xs">
-      Color Mode
+    <UiLabel class="text-xs">
+      明暗模式
     </UiLabel>
     <div class="grid grid-cols-3 gap-2 py-1.5">
       <UiButton
@@ -32,10 +32,11 @@ function setColorMode(colorMode: BasicColorSchema) {
         variant="outline"
         class="justify-center items-center h-8 px-3"
         :class="item.colorMode === mode ? 'border-foreground border-2' : ''"
+        :aria-pressed="item.colorMode === mode"
         @click="setColorMode(item.colorMode)"
       >
         <component :is="item.icon" />
-        <span class="text-xs">{{ item.colorMode }}</span>
+        <span class="text-xs">{{ { light: '浅色', dark: '深色', auto: '系统' }[item.colorMode] }}</span>
       </UiButton>
     </div>
   </div>

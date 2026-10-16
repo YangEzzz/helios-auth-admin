@@ -4,6 +4,7 @@ import { useThemeStore } from '@/store'
 
 export const useSystemTheme = () => {
   const themeStore = useThemeStore()
+  themeStore.upgradeAppearance()
   const { setTheme, setRadius } = themeStore
   const { theme, radius } = storeToRefs(themeStore)
 

@@ -3,19 +3,16 @@ import type { ProjectMemberRow } from './components/member-columns'
 import {
   Activity,
   ArrowLeft,
-  Clock,
   Globe,
   History,
   Loader2,
   Plus,
   Settings,
-  ShieldAlert,
   ShieldCheck,
-  UserCheck,
   Users,
 } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
   reqAddProjectMember,
@@ -29,6 +26,7 @@ import DataTable from '@/components/data-table/data-table.vue'
 import { generateVueTable } from '@/components/data-table/use-generate-vue-table'
 import { BasicPage } from '@/components/global-layout'
 import QueryError from '@/components/query-error.vue'
+import SummaryMetrics from '@/components/summary-metrics.vue'
 
 import { useAdminAccess } from '@/composables/use-admin-access'
 import { useDiscardConfirmation } from '@/composables/use-discard-confirmation'
@@ -38,13 +36,13 @@ import { columns } from './components/member-columns'
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue'
 import SSOClients from './components/SSOClients.vue'
 
-const router = useRouter()
 const route = useRoute()
 const projectId = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
 const { canManage } = useAdminAccess()
 const { projectScope, errors, loading, membersLoading, rolesLoading, auditLoading, project, members, roleTemplates, auditLogs, allUsers, fetchMembers, fetchRoleTemplates, fetchAuditLogs, refreshProject, reset } = useProjectResources(projectId)
 
 // --- 状态管理 ---
+const detailView = ref('members')
 const activeTab = ref('members') // members | audit
 const isSettingsDialogOpen = ref(false)
 
@@ -260,13 +258,6 @@ function formatAction(action: string) {
   return map[action] || action
 }
 
-const stats = computed(() => [
-  { label: '项目成员', value: members.value.length.toString(), icon: Users, color: 'text-primary' },
-  { label: '自定义角色', value: roleTemplates.value.length.toString(), icon: ShieldCheck, color: 'text-primary' },
-  { label: '最近操作', value: auditLogs.value.length > 0 ? formatAction(auditLogs.value[0]?.action || '') : '--', icon: History, color: 'text-primary' },
-  { label: '系统状态', value: '正常', icon: Globe, color: 'text-primary' },
-])
-
 const operationBusy = computed(() => savingSettings.value || removingMember.value || adding.value || editingRole.value || addingTemplate.value)
 const table = generateVueTable({
   get data() { return members.value },
@@ -324,320 +315,234 @@ onMounted(refreshProject)
 </script>
 
 <template>
-  <BasicPage :title="`项目：${project.project_name || '详情'}`" :description="project.description || '项目暂无详细描述信息'">
+  <BasicPage :title="project.project_name || '项目详情'" :description="project.description || '管理项目成员、角色与应用接入'">
     <template #actions>
-      <UiButton variant="outline" size="sm" @click="router.back()">
-        <ArrowLeft class="h-4 w-4 mr-2" /> 返回列表
+      <UiButton as-child variant="outline">
+        <RouterLink to="/projects">
+          <ArrowLeft class="size-4" />返回列表
+        </RouterLink>
       </UiButton>
-      <UiButton size="sm" variant="secondary" :disabled="!canManage() || operationBusy || loading || Boolean(errors.fetchProjectDetail)" class="shadow-none border border-border/60" @click="openProjectSettings">
-        <Settings class="h-3 w-3 mr-2" /> 设置
+      <UiButton :disabled="!canManage() || operationBusy || loading || Boolean(errors.fetchProjectDetail)" @click="openProjectSettings">
+        <Settings class="size-4" />项目设置
       </UiButton>
     </template>
-
-    <QueryError v-for="(message, key) in errors" v-show="message" :key="key" :message="message" @retry="refreshProject" />
-    <div v-if="loading" class="flex flex-col items-center justify-center py-40">
-      <div class="h-14 w-14 rounded-full border-4 border-primary/10 border-t-primary animate-spin mb-6" />
-      <p class="text-[10px] text-muted-foreground tracking-[0.3em] uppercase font-black">
+    <QueryError v-for="(message, key) in errors" v-show="message" :key="key" :message="message" class="mb-4" @retry="refreshProject" />
+    <div v-if="loading" class="workspace-panel flex min-h-80 flex-col items-center justify-center gap-4" role="status">
+      <Loader2 class="size-6 animate-spin text-primary" /><p class="text-sm text-muted-foreground">
         正在加载项目资料…
       </p>
     </div>
-
-    <div v-else class="space-y-6 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-      <!-- Stats Overview -->
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <UiCard v-for="stat in stats" :key="stat.label" class="border-none shadow-sm bg-muted/20 relative group overflow-hidden">
-          <UiCardContent class="p-6 flex items-center justify-between">
-            <div class="relative z-10">
-              <p class="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {{ stat.label }}
-              </p>
-              <p class="text-xl font-black mt-1 tabular-nums truncate max-w-[150px]">
-                {{ stat.value }}
-              </p>
-            </div>
-            <div class="h-12 w-12 rounded-2xl bg-background flex items-center justify-center shadow-md transition-all group-hover:scale-110" :class="[stat.color]">
-              <component :is="stat.icon" class="h-5 w-5" />
-            </div>
-          </UiCardContent>
-          <div class="absolute -right-4 -bottom-4 h-24 w-24 bg-primary/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
-        </UiCard>
-      </div>
-
-      <div class="grid gap-6 md:grid-cols-3">
-        <div class="md:col-span-2 min-w-0 space-y-6">
-          <!-- Main Content Card with Tabs -->
-          <UiCard class="border-border/40 shadow-sm relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
-              <Users class="h-32 w-32 rotate-12" />
-            </div>
-            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-2 relative z-10">
-              <div>
-                <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
-                  <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
-                    <Users class="h-4 w-4 text-primary" />
-                  </div>
-                  成员档案
-                </UiCardTitle>
-                <UiCardDescription class="text-sm ml-11">
-                  当前项目的成员访问控制列表。
-                </UiCardDescription>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all" :class="[activeTab === 'members' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted']"
-                  @click="activeTab = 'members'"
-                >
-                  成员
-                </button>
-                <button
-                  class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all" :class="[activeTab === 'audit' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted']"
-                  @click="activeTab = 'audit'"
-                >
-                  审计
-                </button>
-                <UiDialog v-model:open="isAddMemberDialogOpen">
-                  <UiDialogTrigger as-child>
-                    <UiButton size="sm" variant="outline" class="h-8 rounded-lg font-black text-xs uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/10">
-                      <Plus class="h-3 w-3 mr-1" /> 授权新成员
-                    </UiButton>
-                  </UiDialogTrigger>
-                  <UiDialogContent>
-                    <UiDialogHeader>
-                      <UiDialogTitle class="font-black text-primary">
-                        项目授权发行中心
-                      </UiDialogTitle>
-                      <UiDialogDescription>正在通过安全链路向目标用户发出授权访问邀约。</UiDialogDescription>
-                    </UiDialogHeader>
-                    <div class="grid gap-4 py-4">
-                      <div class="grid gap-2">
-                        <UiLabel class="text-xs font-black uppercase tracking-widest text-muted-foreground pl-1">
-                          目标用户身份
-                        </UiLabel>
-                        <UiSelect v-model="addForm.user_id">
-                          <UiSelectTrigger class="h-11">
-                            <UiSelectValue placeholder="搜索用户云端档案" />
-                          </UiSelectTrigger>
-                          <UiSelectContent>
-                            <UiSelectItem v-for="u in availableUsers" :key="u.id" :value="u.id">
-                              {{ u.name }} ({{ u.email }})
-                            </UiSelectItem>
-                          </UiSelectContent>
-                        </UiSelect>
-                      </div>
-                      <div class="grid gap-2">
-                        <UiLabel class="text-xs font-black uppercase tracking-widest text-muted-foreground pl-1">
-                          授予成员角色
-                        </UiLabel>
-                        <UiSelect v-model="addForm.role">
-                          <UiSelectTrigger class="h-11">
-                            <UiSelectValue :placeholder="roleTemplates.length > 0 ? '选择授予角色' : '警告: 请先添加角色模板'" />
-                          </UiSelectTrigger>
-                          <UiSelectContent>
-                            <UiSelectItem v-for="rt in roleTemplates" :key="rt.id" :value="rt.role_name">
-                              {{ rt.role_name.toUpperCase() }}
-                            </UiSelectItem>
-                          </UiSelectContent>
-                        </UiSelect>
-                      </div>
-                    </div>
-                    <p v-if="errors.handleAddMember" class="text-sm text-destructive" role="alert">
-                      {{ errors.handleAddMember }}
+    <div v-else-if="!errors.fetchProjectDetail" class="space-y-6">
+      <section class="workspace-panel flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
+        <div class="flex size-14 shrink-0 items-center justify-center rounded-xl detail-icon font-display text-2xl font-semibold">
+          {{ project.project_name?.slice(0, 1) || 'P' }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="section-kicker mb-2">
+            PROJECT WORKSPACE
+          </p><p class="break-all font-mono text-sm">
+            {{ project.project_id_string }}
+          </p><p class="mt-2 break-all text-xs text-muted-foreground">
+            {{ project.project_url || '尚未配置应用入口' }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+          <Globe class="size-4 text-primary" />项目访问配置
+        </div>
+      </section>
+      <SummaryMetrics
+        :items="[
+          { label: '项目成员', value: members.length, note: '已分配项目访问角色', icon: Users },
+          { label: '项目角色', tone: 'violet', value: roleTemplates.length, note: '可供成员分配的角色模板', icon: ShieldCheck },
+          { label: '近期操作', tone: 'success', value: auditLogs.length, note: '本次读取的项目操作记录', icon: History },
+        ]"
+      />
+      <UiTabs v-model="detailView" class="space-y-5">
+        <UiTabsList class="h-11 gap-1 bg-transparent p-0">
+          <UiTabsTrigger value="members" class="px-5">
+            成员与角色
+          </UiTabsTrigger><UiTabsTrigger value="applications" class="px-5">
+            应用接入
+          </UiTabsTrigger><UiTabsTrigger value="overview" class="px-5">
+            项目资料
+          </UiTabsTrigger>
+        </UiTabsList>
+        <UiTabsContent value="members" class="space-y-6">
+          <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <section class="workspace-panel min-w-0 overflow-hidden">
+              <header class="panel-heading">
+                <div><h2>成员访问权限</h2><p>管理当前项目的成员与角色分配</p></div><UiButton size="sm" :disabled="!canManage() || operationBusy" @click="isAddMemberDialogOpen = true">
+                  <Plus class="size-4" />添加成员
+                </UiButton>
+              </header>
+              <UiTabs v-model="activeTab" class="p-4 sm:p-6">
+                <UiTabsList class="mb-4">
+                  <UiTabsTrigger value="members">
+                    成员列表
+                  </UiTabsTrigger><UiTabsTrigger value="audit">
+                    项目审计
+                  </UiTabsTrigger>
+                </UiTabsList>
+                <UiTabsContent value="members">
+                  <DataTable v-if="members.length > 0 || membersLoading" :data="members" :columns="columns" :table="table" :loading="membersLoading" /><div v-else class="flex min-h-56 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+                    <Users class="size-8 text-primary" /><p>当前项目还没有成员</p><p class="text-xs">
+                      添加成员并选择角色后，即可分配访问权限。
                     </p>
-                    <UiDialogFooter>
-                      <UiButton variant="outline" @click="isAddMemberDialogOpen = false">
-                        取消
-                      </UiButton>
-                      <UiButton :disabled="adding || roleTemplates.length === 0" @click="handleAddMember">
-                        执行授权指令
-                      </UiButton>
-                    </UiDialogFooter>
-                  </UiDialogContent>
-                </UiDialog>
-              </div>
-            </UiCardHeader>
-            <UiCardContent class="px-6 pb-6 relative z-10">
-              <!-- Tab: Members -->
-              <div v-if="activeTab === 'members'" class="animate-in fade-in duration-300">
-                <DataTable
-                  v-if="members.length > 0"
-                  :data="members"
-                  :columns="columns"
-                  :table="table"
-                  :loading="membersLoading"
-                  class="border-none"
-                />
-                <div v-else class="py-8 text-center border-2 border-dashed rounded-3xl opacity-20 italic font-black uppercase text-xs tracking-widest">
-                  暂无成员登记记录
-                </div>
-              </div>
-
-              <!-- Tab: Audit Logs -->
-              <div v-if="activeTab === 'audit'" class="p-6 animate-in slide-in-from-right-4 duration-500">
-                <div v-if="auditLoading" class="py-12 flex justify-center">
-                  <Loader2 class="h-8 w-8 animate-spin text-primary/50" />
-                </div>
-                <div v-else-if="auditLogs.length > 0" class="relative pl-6 space-y-8 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-primary/50 before:via-primary/20 before:to-transparent">
-                  <div v-for="log in auditLogs" :key="log.id" class="relative">
-                    <div class="absolute -left-6 top-1.5 h-3 w-3 rounded-full border-2 border-primary bg-background shadow-sm shadow-primary/20" />
-                    <div class="flex flex-col gap-2">
-                      <div class="flex items-center gap-3">
-                        <span class="text-[10px] font-black uppercase tracking-tighter bg-primary/10 text-primary px-2 py-0.5 rounded leading-none border border-primary/20 shadow-sm shadow-primary/5">
-                          {{ formatAction(log.action) }}
-                        </span>
-                        <span class="text-[10px] font-mono text-muted-foreground/60 flex items-center">
-                          <Clock class="h-2.5 w-2.5 mr-1" />
-                          {{ new Date(log.created_at).toLocaleString() }}
-                        </span>
-                      </div>
-                      <div class="flex items-start gap-2.5">
-                        <div class="h-7 w-7 rounded-sm bg-muted flex items-center justify-center border border-border/40 overflow-hidden">
-                          <img v-if="log.user?.avatar" :src="log.user.avatar" class="h-full w-full object-cover">
-                          <UserCheck v-else class="h-3.5 w-3.5 opacity-40 text-primary" />
-                        </div>
-                        <div class="flex flex-col">
-                          <span class="text-xs font-black text-foreground leading-tight">{{ log.user?.name || '系统内核' }}</span>
-                          <span class="text-xs text-muted-foreground font-medium italic underline underline-offset-4 decoration-border/60">{{ log.details }}</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                </div>
-                <div v-else class="py-12 text-center text-muted-foreground/30 flex flex-col items-center">
-                  <Activity class="h-12 w-12 mb-4 opacity-10" />
-                  <p class="text-xs font-black uppercase tracking-widest italic">
-                    暂无操作流水记录
-                  </p>
-                </div>
-              </div>
-            </UiCardContent>
-          </UiCard>
-
-          <!-- Role Templates Card -->
-          <UiCard class="border-border/40 shadow-sm relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
-              <ShieldCheck class="h-32 w-32 rotate-12" />
-            </div>
-            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-5 relative z-10">
-              <div>
-                <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
-                  <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
-                    <ShieldCheck class="h-4 w-4 text-primary" />
+                </UiTabsContent>
+                <UiTabsContent value="audit">
+                  <div v-if="auditLoading" class="flex min-h-56 items-center justify-center" role="status">
+                    <Loader2 class="size-6 animate-spin text-primary" />
+                  </div><ol v-else-if="auditLogs.length" class="divide-y divide-border">
+                    <li v-for="log in auditLogs" :key="log.id" class="py-4">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{{ formatAction(log.action) }}</span><span class="text-xs text-muted-foreground">{{ new Date(log.created_at).toLocaleString('zh-CN') }}</span>
+                      </div><p class="mt-3 text-sm">
+                        {{ log.user?.name || '系统' }}
+                      </p><p class="mt-1 break-words text-xs leading-6 text-muted-foreground">
+                        {{ log.details }}
+                      </p>
+                    </li>
+                  </ol><div v-else class="flex min-h-56 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+                    <Activity class="size-8 text-primary" />暂无操作记录。
                   </div>
-                  项目角色定义
-                </UiCardTitle>
-                <UiCardDescription class="text-sm ml-11">
-                  预设本项目中可供分配给成员的各类身份（如管理员、开发者等）。
-                </UiCardDescription>
+                </UiTabsContent>
+              </UiTabs>
+            </section>
+            <section class="workspace-panel overflow-hidden">
+              <header class="panel-heading">
+                <div><h2>角色模板</h2><p>当前项目的访问身份</p></div><UiButton variant="ghost" size="icon" aria-label="添加角色模板" :disabled="!canManage() || operationBusy" @click="isAddRoleTemplateDialogOpen = true">
+                  <Plus class="size-4" />
+                </UiButton>
+              </header><div class="p-5">
+                <div v-if="rolesLoading" class="py-8 text-center" role="status">
+                  <Loader2 class="mx-auto size-5 animate-spin" />
+                </div><div v-else-if="roleTemplates.length" class="space-y-3">
+                  <div v-for="rt in roleTemplates" :key="rt.id" class="rounded-lg border bg-muted/30 p-4">
+                    <div class="flex items-center gap-2">
+                      <ShieldCheck class="size-4 shrink-0 text-primary" /><h3 class="break-all font-mono text-sm font-medium">
+                        {{ rt.role_name }}
+                      </h3>
+                    </div><p class="mt-2 text-xs leading-6 text-muted-foreground">
+                      {{ rt.description || '暂无角色说明' }}
+                    </p>
+                  </div>
+                </div><p v-else class="py-8 text-center text-sm text-muted-foreground">
+                  还没有角色模板。
+                </p><UiButton variant="outline" class="mt-4 w-full" :disabled="!canManage() || operationBusy" @click="isAddRoleTemplateDialogOpen = true">
+                  <Plus class="size-4" />添加角色模板
+                </UiButton>
               </div>
-              <UiButton size="sm" variant="outline" class="h-8 rounded-lg font-black text-xs uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/10" @click="isAddRoleTemplateDialogOpen = true">
-                <Plus class="h-3 w-3 mr-1" /> 添加角色模板
+            </section>
+          </div>
+        </UiTabsContent>
+        <UiTabsContent value="applications" force-mount class="data-[state=inactive]:hidden">
+          <SSOClients :project-id="projectId" />
+        </UiTabsContent>
+        <UiTabsContent value="overview">
+          <section class="workspace-panel overflow-hidden">
+            <header class="panel-heading">
+              <div><h2>项目资料</h2><p>应用身份与接入信息</p></div><UiButton variant="outline" size="sm" :disabled="!canManage() || operationBusy" @click="openProjectSettings">
+                编辑资料
               </UiButton>
-            </UiCardHeader>
-            <UiCardContent class="px-6 pb-6 relative z-10">
-              <div v-if="rolesLoading" class="py-8 flex justify-center opacity-30">
-                <Loader2 class="h-6 w-6 animate-spin" />
-              </div>
-              <div v-else-if="roleTemplates.length > 0" class="grid gap-4 md:grid-cols-2">
-                <div v-for="rt in roleTemplates" :key="rt.id" class="p-5 rounded-3xl border border-border/40 bg-muted/5 hover:bg-primary/5 hover:border-primary/20 transition-all group/rt shadow-inner relative overflow-hidden">
-                  <div class="flex items-center gap-4 mb-2">
-                    <div class="h-7 w-7 rounded-lg bg-background flex items-center justify-center shadow-sm text-primary group-hover/rt:scale-110 transition-transform">
-                      <ShieldAlert class="h-3.5 w-3.5" />
-                    </div>
-                    <h4 class="text-sm font-black uppercase tracking-widest">
-                      {{ rt.role_name }}
-                    </h4>
-                  </div>
-                  <p class="text-xs text-muted-foreground/80 leading-relaxed font-bold ml-11">
-                    {{ rt.description || '暂无模型描述信息' }}
-                  </p>
-                </div>
-              </div>
-              <div v-else class="py-12 text-center border-2 border-dashed rounded-3xl opacity-20 italic font-black uppercase text-xs tracking-widest">
-                等待添加角色定义...
-              </div>
-            </UiCardContent>
-          </UiCard>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="space-y-6">
-          <UiCard class="border-border/40 shadow-sm relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-700">
-              <Globe class="h-32 w-32 rotate-12" />
-            </div>
-            <UiCardHeader class="flex flex-wrap items-center justify-between gap-3 space-y-0 pb-2 relative z-10">
+            </header><dl class="grid gap-x-10 gap-y-6 p-6 sm:grid-cols-2">
               <div>
-                <UiCardTitle class="flex items-center gap-3 font-black tracking-tight text-lg">
-                  <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner">
-                    <Settings class="h-4 w-4 text-primary" />
-                  </div>
-                  项目注册信息
-                </UiCardTitle>
-                <UiCardDescription class="text-sm ml-11">
-                  项目核心元数据。需要修改名称或描述时请使用顶部设置。
-                </UiCardDescription>
-              </div>
-            </UiCardHeader>
-            <UiCardContent class="px-6 pb-6 relative z-10 space-y-4">
-              <div class="space-y-2">
-                <label class="text-xs uppercase font-black text-muted-foreground tracking-widest">
+                <dt class="text-xs text-muted-foreground">
                   项目名称
-                </label>
-                <div class="truncate rounded-xl border border-border/40 bg-muted/5 px-4 py-3 text-sm font-bold">
-                  {{ project.project_name || '--' }}
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <label class="text-xs uppercase font-black text-muted-foreground tracking-widest">
-                  项目描述
-                </label>
-                <div class="min-h-[72px] rounded-xl border border-border/40 bg-muted/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-                  {{ project.description || '暂无描述' }}
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <label class="text-xs uppercase font-black text-muted-foreground tracking-widest">
+                </dt><dd class="mt-2 text-sm font-medium">
+                  {{ project.project_name }}
+                </dd>
+              </div><div>
+                <dt class="text-xs text-muted-foreground">
                   项目标识
-                </label>
-                <div class="truncate rounded-xl border border-border/40 bg-muted/5 px-4 py-3 font-mono text-xs font-black">
-                  {{ project.project_id_string || '--' }}
-                </div>
-                <p class="text-[11px] leading-relaxed text-muted-foreground">
-                  该标识用于业务系统接入与权限验证，创建后不可修改；如果标识填错，需要新建项目。
+                </dt><dd class="mt-2 break-all font-mono text-sm">
+                  {{ project.project_id_string }}
+                </dd><p class="mt-2 text-xs leading-5 text-muted-foreground">
+                  项目创建后不可修改，用于业务系统识别。
                 </p>
-              </div>
-
-              <div class="space-y-2">
-                <label class="text-xs uppercase font-black text-muted-foreground tracking-widest">
-                  项目网址
-                </label>
-                <div class="truncate rounded-xl border border-border/40 bg-muted/5 px-4 py-3 font-mono text-xs font-black">
+              </div><div class="sm:col-span-2">
+                <dt class="text-xs text-muted-foreground">
+                  项目描述
+                </dt><dd class="mt-2 text-sm leading-7">
+                  {{ project.description || '暂无描述' }}
+                </dd>
+              </div><div class="sm:col-span-2">
+                <dt class="text-xs text-muted-foreground">
+                  应用网址
+                </dt><dd class="mt-2 break-all font-mono text-sm">
                   {{ project.project_url || '未配置网址' }}
-                </div>
+                </dd>
+              </div><div>
+                <dt class="text-xs text-muted-foreground">
+                  创建时间
+                </dt><dd class="mt-2 text-sm">
+                  {{ project.created_at ? new Date(project.created_at).toLocaleDateString('zh-CN') : '未知' }}
+                </dd>
+              </div><div>
+                <dt class="text-xs text-muted-foreground">
+                  最近更新
+                </dt><dd class="mt-2 text-sm">
+                  {{ project.updated_at ? new Date(project.updated_at).toLocaleDateString('zh-CN') : '未知' }}
+                </dd>
               </div>
-
-              <div class="grid grid-cols-2 gap-3">
-                <div class="space-y-1">
-                  <label class="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-widest">创建于</label>
-                  <div class="text-xs font-mono font-bold bg-muted/5 px-3 py-2 rounded-lg border border-border/40">
-                    {{ project.created_at ? new Date(project.created_at).toLocaleDateString() : '--' }}
-                  </div>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-widest">更新于</label>
-                  <div class="text-xs font-mono font-bold bg-muted/5 px-3 py-2 rounded-lg border border-border/40">
-                    {{ project.updated_at ? new Date(project.updated_at).toLocaleDateString() : '--' }}
-                  </div>
-                </div>
-              </div>
-            </UiCardContent>
-          </UiCard>
-        </div>
-      </div>
+            </dl>
+          </section>
+        </UiTabsContent>
+      </UiTabs>
     </div>
-
+    <UiDialog v-model:open="isAddMemberDialogOpen">
+      <UiDialogContent>
+        <UiDialogHeader>
+          <UiDialogTitle class="font-semibold text-primary">
+            添加项目成员
+          </UiDialogTitle>
+          <UiDialogDescription>选择成员与项目角色，为其分配访问权限。</UiDialogDescription>
+        </UiDialogHeader>
+        <div class="grid gap-4 py-4">
+          <div class="grid gap-2">
+            <UiLabel class="text-xs font-semibold uppercase tracking-normal text-muted-foreground pl-1">
+              选择成员
+            </UiLabel>
+            <UiSelect v-model="addForm.user_id">
+              <UiSelectTrigger class="h-11 w-full">
+                <UiSelectValue placeholder="选择已激活的用户" />
+              </UiSelectTrigger>
+              <UiSelectContent>
+                <UiSelectItem v-for="u in availableUsers" :key="u.id" :value="u.id">
+                  {{ u.name }} ({{ u.email }})
+                </UiSelectItem>
+              </UiSelectContent>
+            </UiSelect>
+          </div>
+          <div class="grid gap-2">
+            <UiLabel class="text-xs font-semibold uppercase tracking-normal text-muted-foreground pl-1">
+              项目角色
+            </UiLabel>
+            <UiSelect v-model="addForm.role">
+              <UiSelectTrigger class="h-11 w-full">
+                <UiSelectValue :placeholder="roleTemplates.length > 0 ? '选择授予角色' : '警告: 请先添加角色模板'" />
+              </UiSelectTrigger>
+              <UiSelectContent>
+                <UiSelectItem v-for="rt in roleTemplates" :key="rt.id" :value="rt.role_name">
+                  {{ rt.role_name.toUpperCase() }}
+                </UiSelectItem>
+              </UiSelectContent>
+            </UiSelect>
+          </div>
+        </div>
+        <p v-if="errors.handleAddMember" class="text-sm text-destructive" role="alert">
+          {{ errors.handleAddMember }}
+        </p>
+        <UiDialogFooter>
+          <UiButton variant="outline" @click="isAddMemberDialogOpen = false">
+            取消
+          </UiButton>
+          <UiButton :disabled="adding || roleTemplates.length === 0" @click="handleAddMember">
+            添加成员
+          </UiButton>
+        </UiDialogFooter>
+      </UiDialogContent>
+    </UiDialog>
     <!-- Dialogs -->
     <ProjectSettingsDialog v-model:name="settingsForm.project_name" v-model:description="settingsForm.description" v-model:url="settingsForm.project_url" :open="isSettingsDialogOpen" :busy="savingSettings" :project-key="project.project_id_string" :error="errors.handleUpdateProject" @close="closeSettings" @save="handleUpdateProject" />
 
@@ -660,18 +565,18 @@ onMounted(refreshProject)
     <UiDialog v-model:open="isEditRoleDialogOpen">
       <UiDialogContent>
         <UiDialogHeader>
-          <UiDialogTitle class="font-black">
-            角色重新定义
+          <UiDialogTitle class="font-semibold">
+            修改成员角色
           </UiDialogTitle>
-          <UiDialogDescription>正在通过安全核心修改该对象的权柄等级。</UiDialogDescription>
+          <UiDialogDescription>选择该成员在当前项目中的角色。</UiDialogDescription>
         </UiDialogHeader>
         <div class="py-4">
           <UiSelect v-model="roleEditForm.role">
-            <UiSelectTrigger class="h-12 rounded-xl">
-              <UiSelectValue placeholder="重新分发权限" />
+            <UiSelectTrigger class="h-11 w-full">
+              <UiSelectValue placeholder="请选择角色" />
             </UiSelectTrigger>
             <UiSelectContent>
-              <UiSelectItem v-for="rt in roleTemplates" :key="rt.id" :value="rt.role_name" class="font-black uppercase text-xs tracking-widest">
+              <UiSelectItem v-for="rt in roleTemplates" :key="rt.id" :value="rt.role_name" class="font-semibold uppercase text-xs tracking-normal">
                 {{ rt.role_name }}
               </UiSelectItem>
             </UiSelectContent>
@@ -684,8 +589,8 @@ onMounted(refreshProject)
           <UiButton variant="outline" @click="isEditRoleDialogOpen = false">
             取消
           </UiButton>
-          <UiButton :disabled="editingRole" class="px-8 shadow-xl shadow-primary/20" @click="handleUpdateRole">
-            提交变更
+          <UiButton :disabled="editingRole" class="px-8 " @click="handleUpdateRole">
+            保存角色
           </UiButton>
         </UiDialogFooter>
       </UiDialogContent>
@@ -694,21 +599,21 @@ onMounted(refreshProject)
     <UiDialog v-model:open="isAddRoleTemplateDialogOpen">
       <UiDialogContent>
         <UiDialogHeader>
-          <UiDialogTitle class="font-black text-primary">
-            新增权限定义模型
+          <UiDialogTitle class="font-semibold text-primary">
+            添加角色模板
           </UiDialogTitle>
-          <UiDialogDescription>正在构建抽象的权柄模型，应用于本项目所有成员。</UiDialogDescription>
+          <UiDialogDescription>定义项目中可分配给成员的角色与说明。</UiDialogDescription>
         </UiDialogHeader>
         <div class="grid gap-4 py-4">
           <div class="grid gap-2">
-            <UiLabel class="text-xs font-black uppercase tracking-widest opacity-40">
-              模型唯一标识
+            <UiLabel class="text-xs font-semibold uppercase tracking-normal ">
+              角色名称
             </UiLabel>
-            <UiInput v-model="roleTemplateForm.role_name" placeholder="E.G. PLATFORM_OWNER" class="h-11 font-mono uppercase" />
+            <UiInput v-model="roleTemplateForm.role_name" placeholder="例如 developer" class="h-11 font-mono uppercase" />
           </div>
           <div class="grid gap-2">
-            <UiLabel class="text-xs font-black uppercase tracking-widest opacity-40">
-              模型功能描述
+            <UiLabel class="text-xs font-semibold uppercase tracking-normal ">
+              角色说明
             </UiLabel>
             <UiTextarea v-model="roleTemplateForm.description" class="min-h-[100px]" />
           </div>
@@ -720,13 +625,12 @@ onMounted(refreshProject)
           <UiButton variant="outline" @click="isAddRoleTemplateDialogOpen = false">
             取消
           </UiButton>
-          <UiButton :disabled="addingTemplate" class="px-8 shadow-xl shadow-primary/20" @click="handleAddRoleTemplate">
-            初始化此模型
+          <UiButton :disabled="addingTemplate" class="px-8 " @click="handleAddRoleTemplate">
+            添加角色模板
           </UiButton>
         </UiDialogFooter>
       </UiDialogContent>
     </UiDialog>
-    <SSOClients v-if="!loading && !errors.fetchProjectDetail" :project-id="projectId" />
     <UiAlertDialog :open="showDiscardDialog" @update:open="value => { if (!value) resolveDiscard(false) }">
       <UiAlertDialogContent class="z-[100]">
         <UiAlertDialogHeader><UiAlertDialogTitle>放弃未保存的修改？</UiAlertDialogTitle><UiAlertDialogDescription>切换项目或离开页面将丢弃当前表单。</UiAlertDialogDescription></UiAlertDialogHeader><UiAlertDialogFooter>
@@ -740,10 +644,3 @@ onMounted(refreshProject)
     </UiAlertDialog>
   </BasicPage>
 </template>
-
-<style scoped>
-/* 骨架屏和微动效 */
-.before\:from-primary\/50::before {
-  content: '';
-}
-</style>

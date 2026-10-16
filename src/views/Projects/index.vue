@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProjectInfo } from '@/api/project/type'
-import { Activity, ArrowRight, FolderOpen, Plus, Search, Trash2 } from 'lucide-vue-next'
+import { ArrowRight, FolderOpen, Plus, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -8,6 +8,8 @@ import { reqCreateProject, reqDeleteProject, reqListProjects } from '@/api/proje
 import ConfirmDialog from '@/components/confirm-dialog.vue'
 import { BasicPage } from '@/components/global-layout'
 import QueryError from '@/components/query-error.vue'
+import SearchInput from '@/components/search-input.vue'
+import SummaryMetrics from '@/components/summary-metrics.vue'
 import { useAdminAccess } from '@/composables/use-admin-access'
 import { useLatestQuery } from '@/composables/use-latest-query'
 import { errorMessage } from '@/lib/errors'
@@ -35,6 +37,7 @@ const filtered = computed(() => {
     return projects.value
   return projects.value.filter(p =>
     p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    || p.project_id_string.toLowerCase().includes(searchQuery.value.toLowerCase())
     || p.description.toLowerCase().includes(searchQuery.value.toLowerCase()),
   )
 })
@@ -187,31 +190,26 @@ onMounted(() => {
       </UiDialog>
     </template>
 
-    <section class="mb-4 rounded-2xl border border-border/60 bg-card p-4">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div class="flex items-center gap-2">
-            <p class="text-sm font-semibold">
-              项目列表
-            </p>
-            <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {{ filtered.length }} / {{ projects.length }}
-            </span>
-          </div>
-          <p class="mt-1 text-sm text-muted-foreground">
-            管理业务系统接入标识、角色模板与成员授权。
-          </p>
-        </div>
-
-        <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-          <div class="relative flex-1 lg:w-80">
-            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <UiInput v-model="searchQuery" aria-label="搜索项目" placeholder="搜索项目名称、标识或描述" class="h-10 rounded-xl pl-9" />
-          </div>
-          <UiButton variant="outline" size="icon" :disabled="loading" class="h-10 w-10 rounded-xl" @click="fetchProjects">
-            <Activity class="h-4 w-4" :class="[loading ? 'animate-spin' : '']" />
-          </UiButton>
-        </div>
+    <SummaryMetrics
+      :unavailable="!!loadError"
+      class="mb-6" :loading="loading && !projects.length" :items="[
+        { label: '接入项目', value: projects.length, note: '由 Helios 管理的业务项目' },
+        { label: '已配置入口', value: projects.filter(project => project.project_url).length, note: '已填写应用访问地址' },
+        { label: '待配置入口', value: projects.filter(project => !project.project_url).length, note: '可在项目设置中补充网址' },
+      ]"
+    />
+    <section class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-base font-semibold">
+          应用目录 <span class="ml-2 text-sm font-normal text-muted-foreground">{{ filtered.length }} 个项目</span>
+        </h2><p class="mt-1 text-xs text-muted-foreground">
+          选择项目，管理成员、角色与单点登录。
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <SearchInput v-model="searchQuery" label="搜索项目" placeholder="搜索项目名称、标识或描述" class="w-full sm:w-80" /><UiButton variant="outline" size="icon" aria-label="刷新项目列表" :disabled="loading" class="size-10" @click="fetchProjects">
+          <RefreshCw class="size-4" :class="{ 'animate-spin': loading }" />
+        </UiButton>
       </div>
     </section>
 
@@ -223,76 +221,61 @@ onMounted(() => {
       </p>
     </div>
 
-    <div v-else class="space-y-2">
-      <article
-        v-for="project in filtered"
-        :key="project.id"
-        class="group grid cursor-pointer gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 transition-colors duration-200 hover:border-primary/30 hover:bg-muted/20 lg:grid-cols-[1fr_220px_112px]"
-        @click="router.push(`/projects/${project.id}`)"
-      >
-        <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-            <FolderOpen class="h-4 w-4" />
+    <div v-else-if="!loadError" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <article v-for="project in filtered" :key="project.id" class="workspace-panel group flex min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/50">
+        <div class="flex-1 p-6">
+          <div class="mb-5 flex items-start justify-between">
+            <div class="flex size-12 items-center justify-center rounded-xl detail-icon font-display text-xl font-semibold">
+              {{ project.name.slice(0, 1) }}
+            </div><span class="rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">业务项目</span>
           </div>
-          <div class="min-w-0">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 class="truncate text-sm font-semibold text-foreground group-hover:text-primary">
-                {{ project.name }}
-              </h3>
-              <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                active
-              </span>
-            </div>
-            <p class="mt-1 line-clamp-1 text-sm text-muted-foreground">
-              {{ project.description }}
+          <h3 class="text-lg font-semibold">
+            <RouterLink :to="`/projects/${project.id}`" class="hover:text-primary hover:underline underline-offset-4">
+              {{ project.name }}
+            </RouterLink>
+          </h3>
+          <p class="mt-2 min-h-10 text-sm leading-6 text-muted-foreground">
+            {{ project.description }}
+          </p>
+          <div class="mt-5 rounded-lg bg-muted/55 px-3 py-2.5">
+            <p class="text-[11px] text-muted-foreground">
+              项目标识
+            </p><p class="mt-1 break-all font-mono text-xs">
+              {{ project.project_id_string }}
             </p>
           </div>
+          <p class="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <FolderOpen class="size-3.5" />{{ project.project_url ? '已配置应用入口' : '尚未配置应用入口' }}
+          </p>
         </div>
-
-        <div class="flex min-w-0 flex-col justify-center rounded-xl bg-muted/25 px-3 py-2">
-          <span class="text-xs text-muted-foreground">项目标识</span>
-          <span class="mt-0.5 truncate font-mono text-sm font-medium text-foreground">
-            {{ project.project_id_string }}
-          </span>
-        </div>
-
-        <div class="flex items-center justify-between gap-2 lg:justify-end" @click.stop>
-          <div class="mr-auto text-xs text-muted-foreground lg:mr-2">
-            {{ project.createdAt || '未知日期' }}
+        <footer class="flex items-center justify-between border-t bg-muted/20 px-5 py-3">
+          <span class="text-xs text-muted-foreground">创建于 {{ project.createdAt || '未知日期' }}</span><div class="flex items-center gap-1">
+            <UiButton variant="ghost" size="sm" class="text-primary" :aria-label="`查看${project.name}详情`" @click="router.push(`/projects/${project.id}`)">
+              管理<ArrowRight class="size-3.5" />
+            </UiButton><UiButton size="icon" variant="ghost" class="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" :aria-label="`删除${project.name}`" @click="deleteProject(project.id)">
+              <Trash2 class="size-3.5" />
+            </UiButton>
           </div>
-          <UiButton
-            size="icon"
-            variant="ghost"
-            class="h-8 w-8 rounded-lg"
-            @click="router.push(`/projects/${project.id}`)"
-          >
-            <ArrowRight class="h-4 w-4" />
-          </UiButton>
-          <UiButton
-            size="icon"
-            variant="ghost"
-            class="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
-            @click="deleteProject(project.id)"
-          >
-            <Trash2 class="h-4 w-4" />
-          </UiButton>
-        </div>
+        </footer>
       </article>
 
       <!-- Empty State -->
       <div
         v-if="filtered.length === 0"
-        class="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 text-center"
+        class="col-span-full flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 text-center"
       >
         <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
           <FolderOpen class="h-6 w-6" />
         </div>
         <p class="text-sm font-medium">
-          未发现任何项目
+          {{ searchQuery ? '没有匹配的项目' : '还没有接入项目' }}
         </p>
         <p class="text-sm text-muted-foreground mt-1">
-          开始创建你的第一个项目吧
+          {{ searchQuery ? '尝试其他关键词，或清除搜索条件。' : '创建项目后即可配置成员与访问权限。' }}
         </p>
+        <UiButton v-if="searchQuery" variant="outline" class="mt-4" @click="searchQuery = ''">
+          清除搜索
+        </UiButton>
       </div>
     </div>
 

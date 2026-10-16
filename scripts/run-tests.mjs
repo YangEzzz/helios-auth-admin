@@ -150,9 +150,9 @@ finally {
 }
 
 await checkAPIBoundaries(root, [
-  ['sso/clients', 'listSSOClients', ['B'], { method: 'get', url: '/api/v1/sso/clients', params: { project_id: 'B' } }],
-  ['sso/clients', 'saveSSOClient', [{ client_id: 'nexus', project_id: 'B', name: 'test', enabled: true, redirect_uris: ['https://example.test/callback'] }], { method: 'post', url: '/api/v1/sso/clients', data: { client_id: 'nexus', project_id: 'B', name: 'test', enabled: true, redirect_uris: ['https://example.test/callback'] } }],
-  ['sso/clients', 'rotateSSOClientSecret', ['a/b'], { method: 'post', url: '/api/v1/sso/clients/a%2Fb/rotate', data: {} }],
+  ['sso/clients', 'getProjectSSOConfig', ['B'], { method: 'get', url: '/api/v1/sso/projects/B' }],
+  ['sso/clients', 'saveProjectSSOConfig', ['B', { enabled: true, redirect_uris: ['https://example.test/callback'] }], { method: 'post', url: '/api/v1/sso/projects/B', data: { enabled: true, redirect_uris: ['https://example.test/callback'] } }],
+  ['sso/clients', 'rotateProjectSSOSecret', ['a/b'], { method: 'post', url: '/api/v1/sso/projects/a%2Fb/rotate', data: {} }],
   ['sso/auth', 'getSSORequest', ['a&b'], { path: '/request?id=a%26b' }],
   ['sso/auth', 'continueSSOLogin', ['r'], { path: '/continue', data: { request_id: 'r' } }],
   ['sso/auth', 'cancelSSORequest', ['r'], { path: '/cancel', data: { request_id: 'r' } }],

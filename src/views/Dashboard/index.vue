@@ -19,23 +19,24 @@ import {
   Users,
   XCircle,
 } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { toast } from 'vue-sonner'
 import { reqDashboard } from '@/api/dashboard'
 import { BasicPage } from '@/components/global-layout'
-import { errorMessage } from '@/lib/errors'
+import QueryError from '@/components/query-error.vue'
+import { useLatestQuery } from '@/composables/use-latest-query'
+import { isAdminRole, statusLabels } from '@/lib/accounts'
 import { useAuthStore } from '@/store/auth'
 
 const authStore = useAuthStore()
 
-const loading = ref(false)
-const dashboard = ref<DashboardPayload | null>(null)
+const { data: dashboard, loading, error: loadError, refresh: fetchDashboard } = useLatestQuery<DashboardPayload | null>(async () => (await reqDashboard()).data, null)
 
-const roleMode = computed(() => dashboard.value?.role_mode ?? 'user')
 const currentUser = computed(() => authStore.userInfo)
+const roleMode = computed(() => dashboard.value?.role_mode ?? (isAdminRole(currentUser.value?.role) ? 'admin' : 'user'))
 const adminData = computed(() => dashboard.value?.admin)
 const userData = computed(() => dashboard.value?.user)
+const stats = computed(() => roleMode.value === 'admin' ? adminData.value?.stats : userData.value?.summary)
 const generatedAtLabel = computed(() => {
   if (!dashboard.value?.generated_at)
     return '暂未同步'
@@ -43,16 +44,20 @@ const generatedAtLabel = computed(() => {
 })
 
 const statusMap = {
-  pending: { label: '待处理', class: 'bg-amber-500/12 text-amber-700 border-amber-500/20 dark:text-amber-300' },
-  approved: { label: '已通过', class: 'bg-emerald-500/12 text-emerald-700 border-emerald-500/20 dark:text-emerald-300' },
-  rejected: { label: '已拒绝', class: 'bg-rose-500/12 text-rose-700 border-rose-500/20 dark:text-rose-300' },
+  pending: { label: '待处理', class: 'detail-badge', tone: 'warning' },
+  approved: { label: '已通过', class: 'detail-badge', tone: 'success' },
+  rejected: { label: '已拒绝', class: 'detail-badge', tone: 'warning' },
 } as const
 
 const roleMap: Record<string, { label: string, class: string }> = {
-  owner: { label: 'Owner', class: 'bg-fuchsia-500/12 text-fuchsia-700 border-fuchsia-500/20 dark:text-fuchsia-300' },
-  developer: { label: '开发者', class: 'bg-sky-500/12 text-sky-700 border-sky-500/20 dark:text-sky-300' },
-  tester: { label: '测试者', class: 'bg-amber-500/12 text-amber-700 border-amber-500/20 dark:text-amber-300' },
-  viewer: { label: '只读', class: 'bg-slate-500/12 text-slate-700 border-slate-500/20 dark:text-slate-300' },
+  owner: { label: 'Owner', class: 'bg-muted text-foreground border-border' },
+  developer: { label: '开发者', class: 'bg-muted text-foreground border-border' },
+  tester: { label: '测试者', class: 'bg-muted text-foreground border-border' },
+  viewer: { label: '只读', class: 'bg-muted text-foreground border-border' },
+}
+
+function statTone(stat: DashboardStat) {
+  return stat.emphasis === 'approvals' ? 'warning' : ['audit', 'roles'].includes(stat.emphasis || '') ? 'violet' : stat.emphasis === 'access' ? 'success' : 'info'
 }
 
 function statIcon(stat: DashboardStat) {
@@ -74,34 +79,6 @@ function statIcon(stat: DashboardStat) {
   }
 }
 
-function statIconClass(stat: DashboardStat) {
-  switch (stat.tone) {
-    case 'success':
-      return 'text-emerald-500'
-    case 'warning':
-      return 'text-amber-500'
-    case 'accent':
-      return 'text-violet-500'
-    case 'muted':
-      return 'text-muted-foreground'
-    default:
-      return 'text-sky-500'
-  }
-}
-
-function activityToneClass(item: ActivityFeedItem) {
-  switch (item.tone) {
-    case 'success':
-      return 'bg-emerald-500/12 text-emerald-600 border-emerald-500/20'
-    case 'danger':
-      return 'bg-rose-500/12 text-rose-600 border-rose-500/20'
-    case 'info':
-      return 'bg-sky-500/12 text-sky-600 border-sky-500/20'
-    default:
-      return 'bg-muted text-muted-foreground border-border'
-  }
-}
-
 function activityIcon(item: ActivityFeedItem) {
   switch (item.tone) {
     case 'success':
@@ -120,389 +97,200 @@ function roleBadge(project: MyProjectItem) {
   }
 }
 
-async function fetchDashboard() {
-  loading.value = true
-  try {
-    const res = await reqDashboard()
-    dashboard.value = res.data
-  }
-  catch (error: unknown) {
-    toast.error(errorMessage(error) || '仪表盘加载失败')
-  }
-  finally {
-    loading.value = false
-  }
-}
-
 onMounted(() => {
   fetchDashboard()
 })
 
+const quickLinks = computed(() => roleMode.value === 'admin'
+  ? [
+      { title: '账户审批', note: '处理新成员的注册申请', to: '/approvals', icon: Clock3 },
+      { title: '用户管理', note: '维护账户状态与全局角色', to: '/users', icon: Users },
+      { title: '项目接入', note: '配置应用与项目访问权限', to: '/projects', icon: FolderKanban },
+    ]
+  : [
+      { title: '我的项目', note: '查看全部项目授权与角色', to: '/my-projects', icon: FolderKanban },
+      { title: '个人资料', note: '查看身份资料与账户状态', to: '/profile', icon: User },
+    ])
+const activityFeed = computed(() => (roleMode.value === 'admin' ? adminData.value?.activity_feed : userData.value?.activity_feed) || [])
 const projectHighlights = computed(() => (userData.value?.projects ?? []).slice(0, 3))
 </script>
 
 <template>
-  <BasicPage title="仪表盘" description="系统状态、授权节奏与个人工作流概览">
+  <BasicPage title="仪表盘" description="团队身份、项目接入与权限变更的统一视图">
     <template #actions>
-      <UiButton variant="outline" size="sm" :disabled="loading" @click="fetchDashboard">
-        <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
-        刷新数据
+      <span class="hidden text-xs text-muted-foreground xl:block">最近同步 {{ generatedAtLabel }}</span>
+      <UiButton variant="outline" :disabled="loading" @click="fetchDashboard">
+        <RefreshCw class="size-4" :class="{ 'animate-spin': loading }" />刷新数据
       </UiButton>
     </template>
-
-    <div class="space-y-4">
-      <section class="rounded-2xl border border-border/60 bg-card p-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="min-w-0 space-y-2">
-            <div class="inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-sm font-medium text-muted-foreground">
-              <Sparkles class="h-3.5 w-3.5 text-primary" />
-              数据更新时间 {{ generatedAtLabel }}
+    <div class="space-y-6">
+      <QueryError v-if="loadError" :message="loadError" @retry="fetchDashboard" />
+      <section class="overview-banner grid gap-6 rounded-xl px-6 py-7 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div class="min-w-0">
+          <p class="mb-3 text-xs font-medium tracking-wider text-[var(--brand-caption)]">
+            HELIOS · {{ roleMode === 'admin' ? '身份与访问控制台' : '个人工作空间' }}
+          </p>
+          <h2 class="font-display text-2xl font-semibold sm:text-3xl">
+            {{ (roleMode === 'user' ? userData?.welcome_title : '') || `你好，${currentUser?.name || 'Helios 用户'}` }}
+          </h2>
+          <p class="mt-3 max-w-xl text-sm leading-6 text-[var(--brand-caption)]">
+            {{ (roleMode === 'admin' ? adminData?.system_headline : userData?.welcome_note) || '查看账户申请，管理项目授权，追踪每一次权限变更。' }}
+          </p>
+        </div>
+        <div class="account-summary min-w-0 border-t border-[var(--brand-border)] pt-5 lg:max-w-72 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <div class="flex items-center gap-3">
+            <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-lg font-medium">
+              {{ currentUser?.name?.slice(0, 1) || 'H' }}
             </div>
-            <div class="space-y-1">
-              <h2 class="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-                {{ userData?.welcome_title || `你好，${currentUser?.name || 'Helios 用户'}` }}
-              </h2>
-              <p class="line-clamp-1 max-w-2xl text-base text-muted-foreground">
-                {{ roleMode === 'admin' ? adminData?.system_headline : userData?.welcome_note }}
-              </p>
-            </div>
-          </div>
-
-          <div class="grid gap-2 sm:grid-cols-2 lg:min-w-[320px]">
-            <div class="rounded-xl border border-border/60 bg-muted/20 p-3">
-              <p class="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                当前身份
-              </p>
-              <p class="mt-1 text-base font-semibold">
-                {{ roleMode === 'admin' ? '管理员视角' : '个人工作台' }}
-              </p>
-              <p class="mt-1 truncate text-sm text-muted-foreground">
-                {{ currentUser?.email || '未读取到邮箱' }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-border/60 bg-muted/20 p-3">
-              <p class="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                账号状态
-              </p>
-              <p class="mt-1 text-base font-semibold capitalize">
-                {{ userData?.account_status || currentUser?.status || 'unknown' }}
-              </p>
-              <p class="mt-1 truncate text-sm text-muted-foreground">
-                {{ roleMode === 'admin' ? '可查看审批、项目与审计节奏' : '可查看授权项目与最近行为' }}
+            <div class="min-w-0">
+              <p class="text-sm font-medium">
+                {{ roleMode === 'admin' ? '管理员工作空间' : '成员工作空间' }}
+              </p><p class="mt-1 break-all text-xs text-[var(--brand-caption)]">
+                {{ currentUser?.email }}
               </p>
             </div>
           </div>
+          <p class="mt-4 flex items-center gap-2 text-xs text-[var(--brand-caption)]">
+            <Shield class="size-3.5" />账户状态 · {{ statusLabels[userData?.account_status || currentUser?.status || ''] || '状态未知' }}
+          </p>
         </div>
       </section>
-
-      <section v-if="loading && !dashboard" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <UiCard v-for="index in 4" :key="index" class="rounded-2xl border-border/50">
-          <UiCardContent class="space-y-3 p-4">
-            <UiSkeleton class="h-4 w-20" />
-            <UiSkeleton class="h-7 w-24" />
-            <UiSkeleton class="h-4 w-32" />
-          </UiCardContent>
-        </UiCard>
+      <section v-if="loading && !dashboard" class="workspace-panel flex min-h-40 items-center justify-center gap-3" role="status">
+        <UiSpinner class="size-5" /><span class="text-sm text-muted-foreground">正在加载概览数据…</span>
       </section>
-
       <template v-else-if="dashboard">
-        <section v-if="roleMode === 'admin'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <UiCard v-for="stat in adminData?.stats" :key="stat.label" class="rounded-xl border-border/50 shadow-sm">
-            <UiCardContent class="px-3 py-2">
-              <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm text-muted-foreground">
-                    {{ stat.label }}
-                  </p>
-                  <p class="mt-1 text-2xl font-semibold tracking-tight">
-                    {{ stat.value }}
-                  </p>
-                </div>
-                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                  <component :is="statIcon(stat)" class="h-4 w-4" :class="[statIconClass(stat)]" />
-                </div>
-              </div>
-              <p class="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                {{ stat.trend }}
-              </p>
-            </UiCardContent>
-          </UiCard>
+        <section class="metric-strip" aria-label="数据概览" :aria-busy="loading">
+          <div v-for="stat in stats" :key="stat.label" :data-tone="statTone(stat)">
+            <p class="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              {{ stat.label }}<component :is="statIcon(stat)" class="detail-text size-4" aria-hidden="true" />
+            </p>
+            <p class="metric-value mt-3">
+              {{ stat.value }}
+            </p><p class="mt-2 text-xs leading-5 text-muted-foreground">
+              {{ stat.trend }}
+            </p>
+          </div>
         </section>
-
-        <section v-else class="grid gap-3 md:grid-cols-3">
-          <UiCard v-for="stat in userData?.summary" :key="stat.label" class="rounded-xl border-border/50 shadow-sm">
-            <UiCardContent class="px-3 py-2">
-              <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm text-muted-foreground">
-                    {{ stat.label }}
-                  </p>
-                  <p class="mt-1 text-2xl font-semibold tracking-tight">
-                    {{ stat.value }}
-                  </p>
-                </div>
-                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                  <component :is="statIcon(stat)" class="h-4 w-4" :class="[statIconClass(stat)]" />
-                </div>
-              </div>
-              <p class="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                {{ stat.trend }}
+        <section aria-label="常用操作" class="grid gap-3 sm:grid-cols-2" :class="roleMode === 'admin' ? 'xl:grid-cols-3' : ''">
+          <RouterLink v-for="link in quickLinks" :key="link.to" :to="link.to" class="quick-entry group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:border-primary/50 hover:bg-accent">
+            <div :data-tone="link.to === '/approvals' ? 'warning' : link.to === '/users' ? 'violet' : 'info'" class="detail-icon flex size-10 shrink-0 items-center justify-center rounded-xl">
+              <component :is="link.icon" class="size-5" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="text-sm font-semibold">
+                {{ link.title }}
+              </h3><p class="mt-1 text-xs text-muted-foreground">
+                {{ link.note }}
               </p>
-            </UiCardContent>
-          </UiCard>
+            </div><ArrowRight class="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+          </RouterLink>
         </section>
-
-        <section v-if="roleMode === 'admin'" class="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>最近审批节奏</UiCardTitle>
-              <UiCardDescription>优先关注最新通过与拒绝动作，减少待处理堆积。</UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="space-y-3 p-4 pt-2">
-              <div
-                v-for="item in adminData?.approval_feed"
-                :key="item.id"
-                class="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/20 p-3"
-              >
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-background shadow-sm">
-                  <User class="h-4 w-4 text-muted-foreground" />
+        <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <section v-if="roleMode === 'admin'" class="workspace-panel overflow-hidden">
+            <header class="panel-heading">
+              <div><h2>最近审批</h2><p>账户申请与处理结果</p></div><RouterLink to="/approvals" class="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                全部审批<ArrowRight class="size-3.5" />
+              </RouterLink>
+            </header>
+            <div class="divide-y divide-border px-5 sm:px-6">
+              <div v-for="item in adminData?.approval_feed" :key="item.id" class="flex flex-wrap items-center gap-3 py-5 sm:flex-nowrap">
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-primary">
+                  {{ item.name?.slice(0, 1) || 'U' }}
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <p class="text-sm font-medium">
-                      {{ item.name }}
-                    </p>
-                    <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="[statusMap[item.status].class]">
-                      {{ statusMap[item.status].label }}
-                    </span>
-                  </div>
-                  <p class="mt-1 truncate text-sm text-muted-foreground">
+                  <p class="text-sm font-semibold">
+                    {{ item.name }}
+                  </p><p class="mt-1 break-all text-xs text-muted-foreground">
                     {{ item.email }}
                   </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    处理人：{{ item.operator }} · {{ item.time }}
+                </div>
+                <div class="ml-auto text-right">
+                  <span class="rounded-md border px-2 py-1 text-xs font-medium" :class="statusMap[item.status].class" :data-tone="statusMap[item.status].tone">{{ statusMap[item.status].label }}</span><p class="mt-2 text-xs text-muted-foreground">
+                    {{ item.time }}
                   </p>
                 </div>
               </div>
-
-              <div v-if="!adminData?.approval_feed?.length" class="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                最近还没有审批动作。
+              <div v-if="!adminData?.approval_feed?.length" class="flex min-h-56 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+                <CheckCircle2 class="size-8 text-primary" />最近还没有审批动作。
               </div>
-            </UiCardContent>
-          </UiCard>
-
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>系统动态流</UiCardTitle>
-              <UiCardDescription>按最近变化排序，快速判断系统里刚发生了什么。</UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="p-4 pt-2">
-              <div class="max-h-[340px] space-y-3 overflow-y-auto pr-2">
-                <div
-                  v-for="item in adminData?.activity_feed"
-                  :key="item.id"
-                  class="flex gap-3 rounded-xl border border-border/50 bg-background p-3"
-                >
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border" :class="[activityToneClass(item)]">
-                    <component :is="activityIcon(item)" class="h-4 w-4" />
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <p class="text-sm font-medium">
-                        {{ item.action }}
-                      </p>
-                      <span class="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{{ item.resource || '系统' }}</span>
-                    </div>
-                    <p class="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
-                      {{ item.detail }}
-                    </p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {{ item.time }}
-                    </p>
-                  </div>
-                </div>
-
-                <div v-if="!adminData?.activity_feed?.length" class="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  暂无动态记录。
-                </div>
-              </div>
-            </UiCardContent>
-          </UiCard>
-        </section>
-
-        <section v-else class="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>授权项目速览</UiCardTitle>
-              <UiCardDescription>优先展示最近拿到权限的项目，方便继续进入工作流。</UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="space-y-3 p-4 pt-2">
-              <div
-                v-for="project in projectHighlights"
-                :key="project.id"
-                class="rounded-xl border border-border/50 bg-muted/20 p-3"
-              >
+            </div>
+            <footer class="flex items-center gap-2 border-t bg-muted/35 px-6 py-3 text-xs text-muted-foreground">
+              <Shield class="size-3.5" />审批记录与操作日志保持可追踪。
+            </footer>
+          </section>
+          <section v-else class="workspace-panel overflow-hidden">
+            <header class="panel-heading">
+              <div><h2>我的授权项目</h2><p>查看角色与最近授权时间</p></div><RouterLink to="/my-projects" class="text-xs font-medium text-primary hover:underline">
+                全部项目
+              </RouterLink>
+            </header>
+            <div class="divide-y divide-border px-6">
+              <div v-for="project in projectHighlights" :key="project.id" class="py-5">
                 <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold">
+                  <div>
+                    <h3 class="text-sm font-semibold">
                       {{ project.name }}
-                    </p>
-                    <p class="mt-1 text-sm text-muted-foreground">
+                    </h3><p class="mt-1 font-mono text-xs text-muted-foreground">
                       {{ project.project_key }}
                     </p>
-                  </div>
-                  <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="[roleBadge(project).class]">
-                    {{ roleBadge(project).label }}
-                  </span>
-                </div>
-                <p class="mt-2 line-clamp-2 text-sm leading-5 text-muted-foreground">
-                  {{ project.description || '暂无描述' }}
+                  </div><span class="rounded-md border px-2 py-1 text-xs" :class="roleBadge(project).class">{{ roleBadge(project).label }}</span>
+                </div><p class="mt-3 text-sm text-muted-foreground">
+                  {{ project.description }}
+                </p><p class="mt-3 text-xs text-muted-foreground">
+                  授权于 {{ project.granted_at }}
                 </p>
-                <div class="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>授权于 {{ project.granted_at }}</span>
-                  <span>{{ project.granted_at_text }}</span>
-                </div>
               </div>
-
-              <div v-if="!projectHighlights.length" class="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                还没有项目授权记录。
+              <div v-if="!projectHighlights.length" class="py-20 text-center text-sm text-muted-foreground">
+                当前没有已授权项目，联系管理员申请访问。
               </div>
-            </UiCardContent>
-          </UiCard>
-
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>快捷入口</UiCardTitle>
-              <UiCardDescription>
-                把最常用的入口放在首页，减少跳转成本。
-              </UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="p-4 pt-2">
-              <div class="grid gap-2">
-                <RouterLink
-                  to="/my-projects"
-                  class="group flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
-                      <FolderKanban class="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium">
-                        我的项目
-                      </p>
-                      <p class="text-sm text-muted-foreground">
-                        查看全部项目授权与角色
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight class="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </RouterLink>
-                <RouterLink
-                  to="/profile"
-                  class="group flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                      <User class="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium">
-                        个人中心
-                      </p>
-                      <p class="text-sm text-muted-foreground">
-                        更新头像、密码与个人资料
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight class="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </RouterLink>
-              </div>
-            </UiCardContent>
-          </UiCard>
-        </section>
-
-        <section v-if="roleMode !== 'admin'" class="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>我的最近动态</UiCardTitle>
-              <UiCardDescription>
-                按时间顺序整理你的访问与授权痕迹。
-              </UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="p-4 pt-2">
-              <div class="max-h-[340px] space-y-3 overflow-y-auto pr-2">
-                <div
-                  v-for="item in userData?.activity_feed"
-                  :key="item.id"
-                  class="flex gap-3 rounded-xl border border-border/50 bg-background p-3"
-                >
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border" :class="[activityToneClass(item)]">
-                    <component :is="activityIcon(item)" class="h-4 w-4" />
+            </div>
+          </section>
+          <section class="workspace-panel overflow-hidden">
+            <header class="panel-heading">
+              <div><h2>操作时间线</h2><p>最近的访问与权限变化</p></div><RouterLink v-if="roleMode === 'admin'" to="/audit-logs" class="text-xs font-medium text-primary hover:underline">
+                查看日志
+              </RouterLink><Activity v-else class="size-4 text-muted-foreground" />
+            </header>
+            <div class="max-h-[480px] overflow-y-auto px-6 py-5">
+              <ol class="activity-timeline">
+                <li v-for="item in activityFeed" :key="item.id" class="relative flex gap-4 pb-7 last:pb-0">
+                  <div class="timeline-node relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted text-foreground">
+                    <component :is="activityIcon(item)" class="size-3.5" />
                   </div>
                   <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <p class="text-sm font-medium">
+                    <div class="flex flex-wrap justify-between gap-2">
+                      <h3 class="text-sm font-medium">
                         {{ item.action }}
-                      </p>
-                      <span class="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{{ item.resource || '系统' }}</span>
-                    </div>
-                    <p class="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                      </h3><span class="text-xs text-muted-foreground">{{ item.time }}</span>
+                    </div><p class="mt-2 break-words text-xs leading-5 text-muted-foreground">
                       {{ item.detail }}
-                    </p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {{ item.time }}
-                    </p>
+                    </p><span v-if="item.resource" class="mt-2 inline-block rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">{{ item.resource }}</span>
                   </div>
-                </div>
-
-                <div
-                  v-if="!userData?.activity_feed?.length"
-                  class="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground"
-                >
-                  暂无动态记录。
-                </div>
+                </li>
+              </ol>
+              <div v-if="!activityFeed.length" class="py-20 text-center text-sm text-muted-foreground">
+                暂无动态记录。
               </div>
-            </UiCardContent>
-          </UiCard>
-
-          <UiCard class="rounded-2xl border-border/50 shadow-sm">
-            <UiCardHeader class="space-y-1 p-4 pb-2">
-              <UiCardTitle>全部授权项目</UiCardTitle>
-              <UiCardDescription>更完整的项目列表，适合快速扫一遍角色和时间。</UiCardDescription>
-            </UiCardHeader>
-            <UiCardContent class="space-y-2 p-4 pt-2">
-              <div
-                v-for="project in userData?.projects"
-                :key="project.id"
-                class="rounded-xl border border-border/50 bg-muted/20 p-3"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-medium">
-                      {{ project.name }}
-                    </p>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      {{ project.project_key }}
-                    </p>
-                  </div>
-                  <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="[roleBadge(project).class]">
-                    {{ roleBadge(project).label }}
-                  </span>
-                </div>
-                <div class="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{{ project.granted_at }}</span>
-                  <span>{{ project.granted_at_text }}</span>
-                </div>
-              </div>
-
-              <div v-if="!userData?.projects?.length" class="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                当前没有已授权项目。
-              </div>
-            </UiCardContent>
-          </UiCard>
-        </section>
+            </div>
+          </section>
+        </div>
       </template>
     </div>
   </BasicPage>
 </template>
+
+<style scoped>
+.overview-banner {
+  background: var(--brand-ink);
+  color: var(--brand-text);
+}
+.activity-timeline li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+</style>

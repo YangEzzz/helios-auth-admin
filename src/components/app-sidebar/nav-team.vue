@@ -32,7 +32,7 @@ const { navMain } = defineProps<{
 
 const route = useRoute()
 
-const { state, isMobile } = useSidebar()
+const { state, isMobile, setOpenMobile } = useSidebar()
 
 const isCollapsed = (menu: NavItem): boolean => {
   const pathname = route.path
@@ -49,7 +49,7 @@ const isCollapsed = (menu: NavItem): boolean => {
 const isActive = (menu: NavItem): boolean => {
   const pathname = route.path
   if (menu.url) {
-    return pathname === menu.url
+    return pathname === menu.url || pathname.startsWith(`${menu.url}/`)
   }
   return !!menu.items?.some(item => item.url === pathname)
 }
@@ -62,7 +62,7 @@ const isActive = (menu: NavItem): boolean => {
       <template v-for="menu in group.items" :key="menu.title">
         <SidebarMenuItem v-if="!menu.items">
           <SidebarMenuButton as-child :is-active="isActive(menu)" :tooltip="menu.title">
-            <router-link :to="menu.url">
+            <router-link :to="menu.url" :aria-current="isActive(menu) ? 'page' : undefined" @click="isMobile && setOpenMobile(false)">
               <component :is="menu.icon" />
               <span>{{ menu.title }}</span>
             </router-link>

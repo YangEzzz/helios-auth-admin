@@ -7,16 +7,12 @@ import { useThemeStore } from '@/store'
 const themeStore = useThemeStore()
 const { setRadius } = themeStore
 const { radius } = storeToRefs(themeStore)
-
-watchEffect(() => {
-  document.documentElement.style.setProperty('--radius', `${radius.value}rem`)
-})
 </script>
 
 <template>
   <div class="space-y-1.5 pt-6">
-    <UiLabel for="radius" class="text-xs">
-      Radius
+    <UiLabel class="text-xs">
+      圆角
     </UiLabel>
     <div class="grid grid-cols-5 gap-2 py-1.5">
       <UiButton
@@ -24,6 +20,7 @@ watchEffect(() => {
         variant="outline"
         class="justify-center h-8 px-3"
         :class="rayon === radius ? 'border-foreground border-2' : ''"
+        :aria-pressed="rayon === radius"
         @click="setRadius(rayon)"
       >
         <span class="text-xs">{{ rayon }}</span>

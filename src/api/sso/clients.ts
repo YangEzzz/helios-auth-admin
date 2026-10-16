@@ -1,8 +1,15 @@
 import { api } from '@/request'
 
-export interface SSOClient { client_id: string, name: string, enabled: boolean, redirect_uris: string[] }
-export interface SaveSSOClient extends SSOClient { project_id: string }
-const CLIENTS_URL = '/api/v1/sso/clients'
-export const listSSOClients = (projectId: string) => api.get<{ clients: SSOClient[] }>({ url: CLIENTS_URL, params: { project_id: projectId } })
-export const saveSSOClient = (data: SaveSSOClient) => api.post<{ client: SSOClient, client_secret: string }>({ url: CLIENTS_URL, data })
-export const rotateSSOClientSecret = (clientId: string) => api.post<{ client_secret: string }>({ url: `${CLIENTS_URL}/${encodeURIComponent(clientId)}/rotate`, data: {} })
+export interface ProjectSSOConfig {
+  client_id: string
+  name: string
+  configured: boolean
+  credential_ready: boolean
+  enabled: boolean
+  mixed_enabled: boolean
+  redirect_uris: string[]
+}
+const projectURL = (projectId: string) => `/api/v1/sso/projects/${encodeURIComponent(projectId)}`
+export const getProjectSSOConfig = (projectId: string) => api.get<{ config: ProjectSSOConfig }>({ url: projectURL(projectId) })
+export const saveProjectSSOConfig = (projectId: string, data: { enabled: boolean, redirect_uris: string[] }) => api.post<{ config: ProjectSSOConfig, client_secret: string }>({ url: projectURL(projectId), data })
+export const rotateProjectSSOSecret = (projectId: string) => api.post<{ client_secret: string }>({ url: `${projectURL(projectId)}/rotate`, data: {} })

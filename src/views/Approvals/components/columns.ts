@@ -21,11 +21,11 @@ export const columns: ColumnDef<ApprovalRow>[] = [
       const u = row.original
       return h('div', { class: 'flex items-center gap-3 py-1' }, [
         h('div', {
-          class: 'h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background shadow-sm',
+          class: 'h-9 w-9 rounded-full bg-muted border border-primary/10 flex items-center justify-center text-primary font-medium text-xs ring-2 ring-background ',
         }, u.name.substring(0, 1).toUpperCase()),
         h('div', { class: 'flex flex-col min-w-0' }, [
-          h('span', { class: 'font-bold text-sm truncate max-w-[150px]' }, u.name),
-          h('span', { class: 'text-[10px] text-muted-foreground truncate max-w-[150px]' }, u.email),
+          h('span', { class: 'font-medium text-sm truncate max-w-[150px]' }, u.name),
+          h('span', { class: 'text-xs text-muted-foreground break-all max-w-[220px]' }, u.email),
         ]),
       ])
     },
@@ -63,7 +63,7 @@ export const columns: ColumnDef<ApprovalRow>[] = [
           variant: 'outline',
           disabled: !meta?.canManage() || meta.busy,
           size: 'sm',
-          class: 'text-green-600 hover:text-green-700 hover:bg-green-50 h-8 font-bold border-green-100',
+          class: 'text-green-600 hover:text-green-700 hover:bg-green-50 h-8 font-medium border-green-100',
           onClick: () => meta?.onApprove(u.id),
         }, () => h('div', { class: 'flex items-center' }, [
           h(Check, { class: 'h-4 w-4 mr-1' }),
@@ -73,7 +73,7 @@ export const columns: ColumnDef<ApprovalRow>[] = [
           variant: 'outline',
           disabled: !meta?.canManage() || meta.busy,
           size: 'sm',
-          class: 'text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold border-red-100',
+          class: 'text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-medium border-red-100',
           onClick: () => meta?.onReject(u.id),
         }, () => h('div', { class: 'flex items-center' }, [
           h(X, { class: 'h-4 w-4 mr-1' }),

@@ -1,41 +1,33 @@
 <script setup lang="ts">
 import { useCookies } from '@vueuse/integrations/useCookies'
 import { storeToRefs } from 'pinia'
+import { computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+import { sidebarData } from '@/components/app-sidebar/data/sidebar-data'
 import AppSidebar from '@/components/app-sidebar/index.vue'
-import ThemePopover from '@/components/custom-theme/theme-popover.vue'
-import ToggleTheme from '@/components/toggle-theme.vue'
-import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { SIDEBAR_COOKIE_NAME } from '@/components/ui/sidebar/utils'
-import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store'
 
 const defaultOpen = useCookies([SIDEBAR_COOKIE_NAME])
 const themeStore = useThemeStore()
 const { contentLayout } = storeToRefs(themeStore)
+const route = useRoute()
+const pageTitle = computed(() => String(route.meta.title || sidebarData.navMain.flatMap(group => group.items).find(item => item.url === route.path)?.title || '工作空间'))
+watch(pageTitle, title => document.title = `${title} · Helios`, { immediate: true })
 </script>
 
 <template>
   <SidebarProvider :default-open="defaultOpen.get(SIDEBAR_COOKIE_NAME)">
+    <a href="#page-content" class="skip-link">跳转到页面内容</a>
     <AppSidebar />
-    <SidebarInset class="w-full max-w-full peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)] peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]">
-      <header
-        class="flex items-center gap-3 sm:gap-4 h-16 p-4 shrink-0 transition-[width,height] ease-linear"
-      >
-        <SidebarTrigger class="-ml-1" />
-        <Separator orientation="vertical" class="h-6" />
-        <div class="flex-1" />
-        <div class="ml-auto flex items-center space-x-4">
-          <ToggleTheme />
-          <ThemePopover />
-        </div>
-      </header>
+    <SidebarInset class="min-w-0">
+      <SidebarTrigger class="fixed left-3 top-3 z-40 size-9 border bg-card shadow-sm md:hidden" aria-label="打开导航菜单" />
       <div
-        :class="cn(
-          'p-4 grow',
-          contentLayout === 'centered' ? 'container mx-auto ' : '',
-        )"
+        id="page-content" tabindex="-1"
+        class="app-content min-w-0 grow px-4 pb-6 pt-16 outline-none sm:px-8 md:py-8"
+        :class="contentLayout === 'centered' ? 'mx-auto w-full max-w-[1560px]' : 'w-full'"
       >
         <router-view />
       </div>

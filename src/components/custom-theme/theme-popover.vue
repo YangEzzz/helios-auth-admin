@@ -16,8 +16,8 @@ import ToggleColorMode from './toggle-color-mode.vue'
 
 <template>
   <Popover>
-    <PopoverTrigger>
-      <UiButton variant="outline" size="icon">
+    <PopoverTrigger as-child>
+      <UiButton variant="ghost" size="icon" aria-label="自定义外观">
         <Paintbrush />
       </UiButton>
     </PopoverTrigger>

@@ -1,24 +1,22 @@
-import type { SSOClient } from '@/api/sso/clients'
+import type { ProjectSSOConfig } from '@/api/sso/clients'
 import { onScopeDispose, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { listSSOClients, rotateSSOClientSecret, saveSSOClient } from '@/api/sso/clients'
+import { getProjectSSOConfig, rotateProjectSSOSecret, saveProjectSSOConfig } from '@/api/sso/clients'
 import { useRequestScope } from '@/composables/use-request-scope'
 
-type Client = SSOClient
 export function useSSOClients(getProjectId: () => string, canManage: () => boolean) {
   const scope = useRequestScope(() => getProjectId())
   let loadVersion = 0
   const loaded = ref(false)
-  const clients = ref<Client[]>([])
+  const config = ref<ProjectSSOConfig>()
   const loading = ref(false)
   const busy = ref(false)
   const error = ref('')
   const secret = ref('')
   const showSecret = ref(false)
-  const editing = ref(false)
   const confirmRotation = ref(false)
-  const form = reactive({ client_id: '', name: '', redirects: '', enabled: true })
+  const form = reactive({ redirects: '', enabled: true })
 
   async function load() {
     const ticket = scope.capture()
@@ -27,9 +25,13 @@ export function useSSOClients(getProjectId: () => string, canManage: () => boole
     loading.value = true
     error.value = ''
     try {
-      const result = (await listSSOClients(ticket.context)).data.clients
+      const result = (await getProjectSSOConfig(ticket.context)).data.config
       if (ticket.isCurrent() && version === loadVersion) {
-        clients.value = result
+        if (!config.value) {
+          form.redirects = result.redirect_uris.join('\n')
+          form.enabled = result.enabled
+        }
+        config.value = result
         loaded.value = true
       }
     }
@@ -43,42 +45,30 @@ export function useSSOClients(getProjectId: () => string, canManage: () => boole
     }
   }
 
-  function edit(client?: Client) {
-    editing.value = !!client
-    form.client_id = client?.client_id || ''
-    form.name = client?.name || ''
-    form.redirects = client?.redirect_uris.join('\n') || ''
-    form.enabled = client?.enabled ?? true
-    secret.value = ''
-    showSecret.value = false
-    error.value = ''
-  }
-
   async function save() {
     const ticket = scope.capture()
     if (!canManage() || !loaded.value || busy.value)
       return
     error.value = ''
-    if (!form.client_id.trim() || !form.name.trim() || !form.redirects.trim()) {
-      error.value = '请填写应用标识、名称和回调地址'
+    if (!form.redirects.trim()) {
+      error.value = '请填写项目后端的 SSO 登录回调地址'
       return
     }
     busy.value = true
     try {
-      const result = await saveSSOClient({
-        client_id: form.client_id.trim(),
-        project_id: ticket.context,
-        name: form.name.trim(),
+      const result = await saveProjectSSOConfig(ticket.context, {
         enabled: form.enabled,
         redirect_uris: form.redirects.split('\n').map(value => value.trim()).filter(Boolean),
       })
       if (!ticket.isCurrent())
         return
-      editing.value = true
-      secret.value = result.data.client_secret
-      showSecret.value = false
-      toast.success('接入配置已保存')
-      await load()
+      config.value = result.data.config
+      form.redirects = result.data.config.redirect_uris.join('\n')
+      if (result.data.client_secret) {
+        secret.value = result.data.client_secret
+        showSecret.value = false
+      }
+      toast.success('登录配置已保存')
     }
     catch (cause) {
       if (ticket.isCurrent())
@@ -92,12 +82,12 @@ export function useSSOClients(getProjectId: () => string, canManage: () => boole
 
   async function rotate() {
     const ticket = scope.capture()
-    if (!canManage() || !loaded.value || busy.value)
+    if (!canManage() || !loaded.value || !config.value?.credential_ready || busy.value)
       return
     busy.value = true
     error.value = ''
     try {
-      const result = await rotateSSOClientSecret(form.client_id)
+      const result = await rotateProjectSSOSecret(ticket.context)
       if (!ticket.isCurrent())
         return
       secret.value = result.data.client_secret
@@ -125,10 +115,13 @@ export function useSSOClients(getProjectId: () => string, canManage: () => boole
 
   watch(() => getProjectId(), () => {
     scope.invalidate()
-    clients.value = []
+    config.value = undefined
     secret.value = ''
     busy.value = false
-    edit()
+    form.redirects = ''
+    form.enabled = true
+    confirmRotation.value = false
+    showSecret.value = false
     load()
   }, { immediate: true })
   onScopeDispose(() => {
@@ -144,5 +137,5 @@ export function useSSOClients(getProjectId: () => string, canManage: () => boole
   onBeforeRouteLeave(canLeave)
   onBeforeRouteUpdate(canLeave)
 
-  return { clients, loading, busy, error, secret, showSecret, editing, confirmRotation, form, load, edit, save, rotate, copySecret, loaded }
+  return { config, loading, busy, error, secret, showSecret, confirmRotation, form, load, save, rotate, copySecret, loaded }
 }

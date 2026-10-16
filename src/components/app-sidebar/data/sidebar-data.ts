@@ -20,7 +20,7 @@ const teams: Team[] = [
     name: 'Helios Auth',
     logo: GalleryVerticalEnd,
     logoUrl: '/helios-icon.svg',
-    plan: '项目入口',
+    plan: '账户与访问管理',
   },
 ]
 
@@ -29,7 +29,7 @@ export const sidebarData: SidebarData = {
   teams,
   navMain: [
     {
-      title: '常规',
+      title: '工作空间',
       items: [
         { title: '仪表盘', url: '/dashboard', icon: LayoutDashboard },
         { title: '我的项目', url: '/my-projects', icon: FolderOpen },

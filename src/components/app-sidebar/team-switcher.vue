@@ -85,7 +85,7 @@ function openProject(project: ProjectInfo) {
 
 function goProjects() {
   menuOpen.value = false
-  router.push('/projects')
+  router.push(canReadAllProjects.value ? '/projects' : '/my-projects')
 }
 
 onMounted(() => {
@@ -102,18 +102,18 @@ onMounted(() => {
             size="lg"
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
-            <div class="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg bg-transparent text-sidebar-primary-foreground">
+            <div class="flex aspect-square size-10 items-center justify-center overflow-hidden rounded-xl bg-white/10 text-sidebar-primary-foreground">
               <img
                 v-if="activeTeam.logoUrl"
                 :src="activeTeam.logoUrl"
                 :alt="activeTeam.name"
-                class="h-full w-full object-contain"
+                class="helios-brand-mark h-full w-full object-contain"
               >
               <component :is="activeTeam.logo" v-else class="size-4" />
             </div>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-semibold">{{ activeTeam.name }}</span>
-              <span class="truncate text-xs">{{ activeTeam.plan }}</span>
+              <span class="truncate font-display text-xl font-semibold">{{ activeTeam.name }}</span>
+              <span class="truncate text-xs text-sidebar-foreground/70">{{ activeTeam.plan }}</span>
             </div>
             <ChevronsUpDown class="ml-auto" />
           </SidebarMenuButton>

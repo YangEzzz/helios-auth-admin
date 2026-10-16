@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { Camera, CheckCircle, Loader2 } from 'lucide-vue-next'
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { Camera, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { reqRegister, reqUploadAvatar } from '@/api/user'
+import AuthShell from '@/components/auth-shell.vue'
 import { errorMessage } from '@/lib/errors'
 
-const router = useRouter()
+const showPassword = ref(false)
+const composing = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
+const submitError = ref('')
+onMounted(() => {
+  document.title = '申请账户 · Helios'
+})
 const form = ref({
   name: '',
   email: '',
@@ -58,13 +64,21 @@ const loading = ref(false)
 const submitted = ref(false)
 
 async function handleRegister() {
-  if (!form.value.name || !form.value.email || !form.value.password) {
-    toast.error('请填写必要信息')
+  if (loading.value || uploading.value || composing.value)
     return
-  }
-
-  if (form.value.password !== form.value.confirmPassword) {
-    toast.error('两次输入的密码不一致')
+  fieldErrors.value = {}
+  submitError.value = ''
+  if (!form.value.name.trim())
+    fieldErrors.value['reg-name'] = '请输入姓名'
+  if (!/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(form.value.email.trim()))
+    fieldErrors.value['reg-email'] = '请输入有效的邮箱地址'
+  if (!form.value.password)
+    fieldErrors.value['reg-password'] = '请设置登录密码'
+  if (!form.value.confirmPassword || form.value.password !== form.value.confirmPassword)
+    fieldErrors.value['reg-confirm'] = '请确认两次输入的密码一致'
+  const firstError = Object.keys(fieldErrors.value)[0]
+  if (firstError) {
+    document.getElementById(firstError)?.focus()
     return
   }
 
@@ -75,7 +89,7 @@ async function handleRegister() {
     toast.success('申请提交成功')
   }
   catch (e: unknown) {
-    toast.error(errorMessage(e) || '申请提交失败')
+    submitError.value = errorMessage(e) || '申请提交失败，请重试'
   }
   finally {
     loading.value = false
@@ -84,136 +98,89 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="flex items-center justify-center min-h-screen p-4 min-w-screen bg-background">
-    <main class="flex flex-col gap-6 w-full max-w-md">
-      <!-- Logo / Brand -->
-      <div class="flex flex-col items-center gap-2 text-center">
-        <img src="/helios-icon.svg" alt="Helios Auth" class="h-14 w-14 rounded-2xl shadow-sm">
-        <h1 class="text-2xl font-bold tracking-tight">
-          Helios Auth Admin
-        </h1>
-        <p class="text-muted-foreground text-sm">
-          申请管理后台账户
+  <AuthShell :title="submitted ? '申请已提交' : '加入团队工作空间'" :description="submitted ? '你的账户申请已进入审批队列。' : '填写账户信息，管理员审批通过后即可登录。'" wide>
+    <div v-if="submitted" class="rounded-xl border bg-muted/40 p-8 text-center">
+      <CheckCircle class="mx-auto mb-5 size-12 text-primary" />
+      <p class="text-sm leading-6 text-muted-foreground">
+        等待管理员审批后，使用你的邮箱和密码登录。
+      </p>
+      <UiButton as-child class="mt-6">
+        <RouterLink to="/login">
+          返回登录
+        </RouterLink>
+      </UiButton>
+    </div>
+    <form v-else novalidate class="space-y-5" :aria-busy="loading" @compositionstart="composing = true" @compositionend="composing = false" @submit.prevent="handleRegister">
+      <div class="mb-6 flex items-center gap-4 rounded-xl border border-dashed bg-muted/30 p-4">
+        <input ref="fileInput" type="file" class="hidden" accept="image/*" aria-label="选择头像文件" @change="handleFileChange">
+        <button type="button" aria-label="上传或更换头像" :disabled="uploading || loading" class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground hover:bg-accent" @click="triggerUpload">
+          <Loader2 v-if="uploading" class="size-5 animate-spin" /><img v-else-if="form.avatar" :src="form.avatar" alt="账户头像" class="h-full w-full object-cover"><Camera v-else class="size-5" />
+        </button>
+        <div>
+          <p class="text-sm font-medium">
+            添加头像 <span class="text-xs font-normal text-muted-foreground">可选</span>
+          </p><p class="mt-1 text-xs text-muted-foreground">
+            图片大小不超过 10 MB
+          </p>
+        </div>
+      </div>
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div class="space-y-2">
+          <UiLabel for="reg-name">
+            姓名 <span class="text-destructive">*</span>
+          </UiLabel><UiInput id="reg-name" v-model="form.name" autocomplete="name" placeholder="你的姓名" class="h-11" :aria-invalid="!!fieldErrors['reg-name']" aria-describedby="reg-name-error" /><p id="reg-name-error" class="text-xs text-destructive">
+            {{ fieldErrors['reg-name'] }}
+          </p>
+        </div>
+        <div class="space-y-2">
+          <UiLabel for="reg-dept">
+            部门
+          </UiLabel><UiInput id="reg-dept" v-model="form.department" autocomplete="organization" placeholder="所在部门或团队" class="h-11" />
+        </div>
+      </div>
+      <div class="space-y-2">
+        <UiLabel for="reg-email">
+          邮箱 <span class="text-destructive">*</span>
+        </UiLabel><UiInput id="reg-email" v-model="form.email" type="email" autocomplete="username" placeholder="name@example.com" class="h-11" :aria-invalid="!!fieldErrors['reg-email']" aria-describedby="reg-email-error" /><p id="reg-email-error" class="text-xs text-destructive">
+          {{ fieldErrors['reg-email'] }}
         </p>
       </div>
-
-      <!-- 提交成功状态 -->
-      <UiCard v-if="submitted" class="w-full shadow-sm">
-        <UiCardContent class="flex flex-col items-center gap-4 py-8">
-          <div class="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-            <CheckCircle class="h-8 w-8" />
-          </div>
-          <div class="text-center">
-            <h2 class="text-lg font-semibold">
-              申请已提交
-            </h2>
-            <p class="text-sm text-muted-foreground mt-1">
-              您的账户申请已提交，管理员审批后将通过邮件通知您。
-            </p>
-          </div>
-          <UiButton variant="outline" class="mt-2" @click="router.push('/login')">
-            返回登录
-          </UiButton>
-        </UiCardContent>
-      </UiCard>
-
-      <!-- 注册表单 -->
-      <UiCard v-else class="w-full shadow-sm">
-        <UiCardHeader>
-          <UiCardTitle class="text-xl">
-            申请账户
-          </UiCardTitle>
-          <UiCardDescription>
-            填写信息后等待管理员审批，审批通过后您将收到邮件通知
-          </UiCardDescription>
-        </UiCardHeader>
-        <UiCardContent class="grid gap-4 pt-4">
-          <!-- 头像上传区域 -->
-          <div class="flex flex-col items-center gap-3 mb-2">
-            <input
-              ref="fileInput"
-              type="file"
-              class="hidden"
-              accept="image/*"
-              @change="handleFileChange"
-            >
-            <div
-              class="relative h-24 w-24 rounded-full border-2 border-dashed border-muted-foreground/20 flex items-center justify-center bg-muted/30 cursor-pointer overflow-hidden group hover:border-primary/50 transition-colors"
-              @click="triggerUpload"
-            >
-              <template v-if="form.avatar">
-                <img :src="form.avatar" class="h-full w-full object-cover">
-                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera class="h-6 w-6 text-white" />
-                </div>
-              </template>
-              <template v-else-if="uploading">
-                <Loader2 class="h-8 w-8 animate-spin text-primary/50" />
-              </template>
-              <template v-else>
-                <div class="flex flex-col items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                  <Camera class="h-8 w-8" />
-                  <span class="text-[10px] font-black uppercase tracking-tighter">上传头像</span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <div class="grid gap-2">
-            <UiLabel for="reg-name">
-              姓名
-            </UiLabel>
-            <UiInput id="reg-name" v-model="form.name" placeholder="请输入您的姓名" />
-          </div>
-          <div class="grid gap-2">
-            <UiLabel for="reg-email">
-              邮箱
-            </UiLabel>
-            <UiInput id="reg-email" v-model="form.email" type="email" placeholder="your@company.com" />
-          </div>
-          <div class="grid gap-2">
-            <UiLabel for="reg-dept">
-              部门
-            </UiLabel>
-            <UiInput id="reg-dept" v-model="form.department" placeholder="所在部门" />
-          </div>
-          <div class="grid gap-2">
-            <UiLabel for="reg-reason">
-              申请原因
-            </UiLabel>
-            <UiTextarea
-              id="reg-reason"
-              v-model="form.reason"
-              placeholder="简述您申请此账户的用途..."
-              rows="3"
-            />
-          </div>
-          <div class="grid gap-2">
-            <UiLabel for="reg-password">
-              密码
-            </UiLabel>
-            <UiInput id="reg-password" v-model="form.password" type="password" placeholder="设置登录密码" />
-          </div>
-          <div class="grid gap-2">
-            <UiLabel for="reg-confirm">
-              确认密码
-            </UiLabel>
-            <UiInput id="reg-confirm" v-model="form.confirmPassword" type="password" placeholder="再次输入密码" />
-          </div>
-          <UiButton class="w-full mt-2" :disabled="loading" @click="handleRegister">
-            <UiSpinner v-if="loading" class="mr-2 h-4 w-4" />
-            {{ loading ? '提交中...' : '提交申请' }}
-          </UiButton>
-        </UiCardContent>
-        <UiCardFooter class="justify-center">
-          <p class="text-sm text-muted-foreground">
-            已有账户？
-            <UiButton variant="link" class="px-1 h-auto" @click="router.push('/login')">
-              返回登录
-            </UiButton>
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div class="space-y-2">
+          <UiLabel for="reg-password">
+            密码 <span class="text-destructive">*</span>
+          </UiLabel><div class="relative">
+            <UiInput id="reg-password" v-model="form.password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="设置登录密码" class="h-11 pr-10" :aria-invalid="!!fieldErrors['reg-password']" aria-describedby="reg-password-error" /><button type="button" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" class="absolute right-1 top-1.5 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" @click="showPassword = !showPassword">
+              <component :is="showPassword ? EyeOff : Eye" class="size-4" />
+            </button>
+          </div><p id="reg-password-error" class="text-xs text-destructive">
+            {{ fieldErrors['reg-password'] }}
           </p>
-        </UiCardFooter>
-      </UiCard>
-    </main>
-  </div>
+        </div>
+        <div class="space-y-2">
+          <UiLabel for="reg-confirm">
+            确认密码 <span class="text-destructive">*</span>
+          </UiLabel><UiInput id="reg-confirm" v-model="form.confirmPassword" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="再次输入密码" class="h-11" :aria-invalid="!!fieldErrors['reg-confirm']" aria-describedby="reg-confirm-error" /><p id="reg-confirm-error" class="text-xs text-destructive">
+            {{ fieldErrors['reg-confirm'] }}
+          </p>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <UiLabel for="reg-reason">
+          申请原因
+        </UiLabel><UiTextarea id="reg-reason" v-model="form.reason" placeholder="你希望访问哪些项目？" rows="3" />
+      </div>
+      <p v-if="submitError" role="alert" class="text-sm text-destructive">
+        {{ submitError }}
+      </p>
+      <UiButton type="submit" class="h-12 w-full" :disabled="loading || uploading">
+        <UiSpinner v-if="loading" class="size-4" />提交申请
+      </UiButton>
+      <p class="border-t pt-5 text-center text-sm text-muted-foreground">
+        已有账户？<RouterLink to="/login" class="ml-1 font-medium text-primary hover:underline">
+          返回登录
+        </RouterLink>
+      </p>
+    </form>
+  </AuthShell>
 </template>

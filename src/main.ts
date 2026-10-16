@@ -4,7 +4,6 @@ import { setupPlugins } from './plugins'
 import './style.css'
 import 'vue-sonner/style.css' // vue sonner style
 
-import '@/assets/index.css'
 import '@/assets/scrollbar.css'
 import '@/assets/themes.css'
 import '@/assets/chart-theme.css'

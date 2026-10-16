@@ -27,11 +27,11 @@ export const columns: ColumnDef<ProjectMemberRow>[] = [
 
       return h('div', { class: 'flex items-center gap-3 py-1' }, [
         h('div', {
-          class: 'h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center text-primary font-bold text-xs shadow-sm overflow-hidden',
+          class: 'h-8 w-8 rounded-full bg-muted border border-primary/10 flex items-center justify-center text-primary font-medium text-xs  overflow-hidden',
         }, [avatarContent]),
         h('div', { class: 'flex flex-col min-w-0' }, [
-          h('span', { class: 'font-bold text-xs truncate max-w-[120px]' }, u.name),
-          h('span', { class: 'text-[9px] text-muted-foreground truncate max-w-[120px]' }, u.email),
+          h('span', { class: 'font-medium text-xs truncate max-w-[120px]' }, u.name),
+          h('span', { class: 'text-xs text-muted-foreground break-all max-w-[220px]' }, u.email),
         ]),
       ])
     },
@@ -48,14 +48,14 @@ export const columns: ColumnDef<ProjectMemberRow>[] = [
       } as const
       return h(Badge, {
         variant: variants[role as keyof typeof variants] || 'outline',
-        class: 'font-bold uppercase text-[9px] tracking-widest px-2 py-0.5',
+        class: 'font-medium text-xs tracking-normal px-2 py-0.5',
       }, () => role)
     },
   },
   {
     accessorKey: 'joined_at',
     header: '入组日期',
-    cell: ({ row }) => h('div', { class: 'text-[10px] font-mono text-muted-foreground' }, row.getValue('joined_at')),
+    cell: ({ row }) => h('div', { class: 'text-xs font-mono text-muted-foreground' }, row.getValue('joined_at')),
   },
   {
     id: 'actions',

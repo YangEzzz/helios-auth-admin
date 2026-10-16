@@ -8,8 +8,8 @@ import zh from './zh.json'
 export const setupI18n = (app: App) => {
   const i18n = createI18n({
     legacy: false,
-    locale: 'en',
-    fallbackLocale: 'en',
+    locale: 'zh',
+    fallbackLocale: 'zh',
     messages: {
       zh,
       en,

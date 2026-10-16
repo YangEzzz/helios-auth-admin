@@ -11,8 +11,8 @@ const { contentLayout } = storeToRefs(themeStore)
 
 <template>
   <div class="space-y-1.5 pt-6">
-    <UiLabel for="radius" class="text-xs">
-      Content Layout
+    <UiLabel class="text-xs">
+      内容布局
     </UiLabel>
     <div class="grid grid-cols-2 gap-2 py-1.5">
       <UiButton
@@ -20,6 +20,7 @@ const { contentLayout } = storeToRefs(themeStore)
         variant="outline"
         class="justify-center h-8 px-3"
         :class="contentLayout === layout.value ? 'border-foreground border-2' : ''"
+        :aria-pressed="contentLayout === layout.value"
         @click="setContentLayout(layout.value)"
       >
         <component :is="layout.icon" />

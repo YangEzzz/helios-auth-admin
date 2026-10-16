@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   ChevronsUpDown,
   LogOut,
-  UserRoundCog,
 } from 'lucide-vue-next'
 
 import { useRouter } from 'vue-router'
@@ -100,10 +99,6 @@ const handleLogout = async () => {
             <DropdownMenuItem @click="router.push('/profile')">
               <BadgeCheck class="size-4" />
               个人资料
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="router.push('/settings')">
-              <UserRoundCog class="size-4" />
-              账户设置
             </DropdownMenuItem>
           </DropdownMenuGroup>
 

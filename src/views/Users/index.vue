@@ -2,8 +2,10 @@
 import type { UserRow } from './components/columns'
 import type { UserInfo } from '@/api/user/type'
 import {
-  Activity,
-  Search,
+  LockKeyhole,
+  RefreshCw,
+  ShieldCheck,
+  Users,
 } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { toast } from 'vue-sonner'
@@ -11,6 +13,8 @@ import { fetchUserDirectory, reqLockUser, reqSetUserRole, reqUnlockUser } from '
 import ConfirmDialog from '@/components/confirm-dialog.vue'
 import { BasicPage } from '@/components/global-layout'
 import QueryError from '@/components/query-error.vue'
+import SearchInput from '@/components/search-input.vue'
+import SummaryMetrics from '@/components/summary-metrics.vue'
 import { useAdminAccess } from '@/composables/use-admin-access'
 import { useLatestQuery } from '@/composables/use-latest-query'
 import { accountStatusAction } from '@/lib/accounts'
@@ -145,77 +149,95 @@ onMounted(() => {
 </script>
 
 <template>
-  <BasicPage title="成员管理" description="管理系统已注册的账户与权限分配">
+  <BasicPage title="用户管理" description="管理系统已注册的账户与权限分配">
     <QueryError v-if="loadError" :message="loadError" @retry="fetchUsers" />
-    <section class="mt-4 rounded-2xl border border-border/60 bg-card p-4">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div class="flex items-center gap-2">
-            <p class="text-sm font-semibold">
-              成员列表
+    <SummaryMetrics
+      :unavailable="!!loadError"
+      class="mb-6" :loading="loading && !rawUsers.length" :items="[
+        { label: '账户总数', value: users.length, note: '不含待审批的账户申请', icon: Users },
+        { label: '管理账户', tone: 'violet', value: users.filter(user => ['admin', 'super_admin'].includes(user.role)).length, note: '管理员与超级管理员', icon: ShieldCheck },
+        { label: '已锁定', tone: 'warning', value: users.filter(user => user.status === 'locked').length, note: '当前被限制登录的账户', icon: LockKeyhole },
+      ]"
+    />
+    <section class="workspace-panel overflow-hidden">
+      <div class="p-5 sm:p-6">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-semibold">
+                账户目录
+              </p>
+              <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {{ filteredUsers.length }} / {{ users.length }}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-muted-foreground">
+              管理成员状态、全局角色与访问资格。
             </p>
-            <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {{ filteredUsers.length }} / {{ users.length }}
-            </span>
           </div>
-          <p class="mt-1 text-sm text-muted-foreground">
-            管理成员状态、全局角色与访问资格。
-          </p>
+
+          <div class="flex flex-col gap-2 sm:flex-row lg:items-center">
+            <div class="relative sm:w-72">
+              <SearchInput v-model="searchQuery" label="搜索账户" placeholder="搜索姓名、邮箱或部门" />
+            </div>
+            <UiButton variant="outline" size="icon" :disabled="loading" aria-label="刷新成员列表" class="h-10 w-10 rounded-xl" @click="fetchUsers">
+              <RefreshCw class="h-4 w-4" :class="[loading ? 'animate-spin' : '']" />
+            </UiButton>
+          </div>
         </div>
 
-        <div class="flex flex-col gap-2 sm:flex-row lg:items-center">
-          <div class="relative sm:w-72">
-            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <UiInput v-model="searchQuery" aria-label="搜索账户" class="h-10 rounded-xl pl-9" placeholder="搜索姓名、邮箱或部门" />
+        <div class="mt-5 flex flex-col gap-3 border-t pt-4 xl:flex-row xl:items-center">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="mr-2 text-xs text-muted-foreground">角色</span>
+            <button
+              v-for="item in [
+                { label: '全部角色', value: 'all' },
+                { label: '管理员', value: 'admin' },
+                { label: '超级管理员', value: 'super_admin' },
+                { label: '正式成员', value: 'user' },
+              ]"
+              :key="item.value"
+              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+              :class="[roleFilter === item.value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted']"
+              :aria-pressed="roleFilter === item.value"
+              @click="roleFilter = item.value"
+            >
+              {{ item.label }}
+            </button>
+          </div><div class="flex flex-wrap items-center gap-1.5">
+            <span class="mr-2 text-xs text-muted-foreground">状态</span>
+            <button
+              v-for="item in [
+                { label: '全部状态', value: 'all' },
+                { label: '正常', value: 'active' },
+                { label: '锁定', value: 'locked' },
+              ]"
+              :key="item.value"
+              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+              :class="[statusFilter === item.value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted']"
+              :aria-pressed="statusFilter === item.value"
+              @click="statusFilter = item.value"
+            >
+              {{ item.label }}
+            </button>
           </div>
-          <UiButton variant="outline" size="icon" :disabled="loading" aria-label="刷新成员列表" class="h-10 w-10 rounded-xl" @click="fetchUsers">
-            <Activity class="h-4 w-4" :class="[loading ? 'animate-spin' : '']" />
-          </UiButton>
         </div>
       </div>
-
-      <div class="mt-3 flex flex-wrap gap-2">
-        <button
-          v-for="item in [
-            { label: '全部角色', value: 'all' },
-            { label: '管理员', value: 'admin' },
-            { label: '超级管理员', value: 'super_admin' },
-            { label: '正式成员', value: 'user' },
-          ]"
-          :key="item.value"
-          class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-          :class="[roleFilter === item.value ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted']"
-          @click="roleFilter = item.value"
-        >
-          {{ item.label }}
-        </button>
-        <span class="mx-1 h-7 w-px bg-border" />
-        <button
-          v-for="item in [
-            { label: '全部状态', value: 'all' },
-            { label: '正常', value: 'active' },
-            { label: '锁定', value: 'locked' },
-          ]"
-          :key="item.value"
-          class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-          :class="[statusFilter === item.value ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted']"
-          @click="statusFilter = item.value"
-        >
-          {{ item.label }}
-        </button>
+      <div class="border-t p-4 sm:p-6">
+        <UserTable
+          v-if="!loadError || users.length"
+          :data="filteredUsers"
+          :columns="columns"
+          :loading="loading"
+          :busy="changingStatus || settingRole" :current-user-id="currentUserId"
+          @edit-role="openRoleDialog"
+          @delete="handleToggleStatus"
+        />
+        <p v-else class="py-16 text-center text-sm text-muted-foreground">
+          暂时无法读取账户目录，请重试。
+        </p>
       </div>
     </section>
-
-    <div class="mt-3 rounded-2xl border border-border/60 bg-card p-3">
-      <UserTable
-        :data="filteredUsers"
-        :columns="columns"
-        :loading="loading"
-        :busy="changingStatus || settingRole" :current-user-id="currentUserId"
-        @edit-role="openRoleDialog"
-        @delete="handleToggleStatus"
-      />
-    </div>
 
     <!-- 简单弹窗 -->
     <UiDialog v-model:open="isRoleDialogOpen">

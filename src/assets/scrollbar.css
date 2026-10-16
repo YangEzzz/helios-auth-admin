@@ -49,3 +49,16 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+@media (forced-colors: active) {
+  * {
+    scrollbar-color: auto;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: ButtonText;
+    border-color: Canvas;
+  }
+  ::-webkit-scrollbar-track {
+    background: Canvas;
+  }
+}

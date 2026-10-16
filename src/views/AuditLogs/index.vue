@@ -5,13 +5,14 @@ import {
   Activity,
   Download,
   RotateCcw,
-  Search,
   UserCircle2,
 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { getAuditLogs } from '@/api/audit'
 import { BasicPage } from '@/components/global-layout'
 import QueryError from '@/components/query-error.vue'
+import SearchInput from '@/components/search-input.vue'
+import SummaryMetrics from '@/components/summary-metrics.vue'
 import { useLatestQuery } from '@/composables/use-latest-query'
 import { csvCell } from '@/lib/csv'
 
@@ -149,6 +150,10 @@ function handleExport() {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+function submitFilter(event: KeyboardEvent) {
+  if (!event.isComposing)
+    applyFilter()
+}
 </script>
 
 <template>
@@ -167,18 +172,23 @@ function handleExport() {
       </div>
     </template>
 
-    <UiCard class="overflow-hidden border-border/60">
+    <SummaryMetrics
+      :unavailable="!!loadError"
+      class="mb-6" :loading="loading && !logs.length" :items="[
+        { label: '匹配日志', value: total, note: '当前查询条件下的记录总数' },
+        { label: '当前页记录', value: logs.length, note: `展示第 ${pageStart} 至 ${pageEnd} 条` },
+        { label: '当前页码', value: `${page} / ${totalPages}`, note: '历史日志采用服务端分页' },
+      ]"
+    />
+    <UiCard class="gap-0 overflow-hidden py-0">
+      <header class="panel-heading">
+        <div><h2>审计记录</h2><p>账户访问、权限与项目配置变更</p></div><Activity class="size-5 text-primary" />
+      </header>
       <UiCardContent class="space-y-4 p-4 md:p-5">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div class="flex flex-1 flex-col gap-3 sm:flex-row">
             <div class="relative flex-1 xl:max-w-sm">
-              <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <UiInput
-                v-model="resourceFilter"
-                placeholder="按操作对象筛选，例如项目名、用户标识"
-                class="pl-9"
-                @keyup.enter="applyFilter"
-              />
+              <SearchInput v-model="resourceFilter" label="筛选操作对象" placeholder="输入项目名或用户标识" @update:model-value="value => { if (!value) resetFilter() }" @keydown.enter.prevent="submitFilter" />
             </div>
 
             <UiButton variant="outline" :disabled="loading" @click="applyFilter">
@@ -205,7 +215,7 @@ function handleExport() {
           </div>
         </div>
 
-        <div class="rounded-2xl border border-border/60">
+        <div class="rounded-lg border">
           <div class="relative min-h-[420px] overflow-x-auto">
             <UiTable>
               <UiTableHeader class="bg-muted/30">
@@ -229,12 +239,12 @@ function handleExport() {
               </UiTableHeader>
               <UiTableBody>
                 <template v-if="loading && logs.length === 0">
-                  <UiTableRow v-for="i in 6" :key="i">
-                    <UiTableCell><UiSkeleton class="h-10 w-full rounded-xl" /></UiTableCell>
-                    <UiTableCell><UiSkeleton class="h-10 w-full rounded-xl" /></UiTableCell>
-                    <UiTableCell><UiSkeleton class="h-10 w-full rounded-xl" /></UiTableCell>
-                    <UiTableCell><UiSkeleton class="h-10 w-full rounded-xl" /></UiTableCell>
-                    <UiTableCell><UiSkeleton class="ml-auto h-10 w-24 rounded-xl" /></UiTableCell>
+                  <UiTableRow>
+                    <UiTableCell :colspan="5" class="h-[420px] text-center">
+                      <div role="status" class="flex items-center justify-center gap-3">
+                        <UiSpinner class="size-5" /><span class="text-sm text-muted-foreground">正在加载审计记录…</span>
+                      </div>
+                    </UiTableCell>
                   </UiTableRow>
                 </template>
 

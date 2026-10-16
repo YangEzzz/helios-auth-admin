@@ -90,7 +90,7 @@ onMounted(load)
   <main class="flex min-h-dvh items-center justify-center bg-background p-6">
     <div class="grid w-full max-w-sm gap-6">
       <div class="flex items-center gap-3">
-        <img src="/helios-icon.svg" alt="" class="size-10 rounded-lg">
+        <img src="/helios-icon.svg" alt="" class="helios-brand-mark size-10 rounded-lg">
         <div>
           <p class="font-semibold tracking-tight">
             Helios
